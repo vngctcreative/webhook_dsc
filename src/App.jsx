@@ -426,7 +426,7 @@ export default function App() {
                 <div className="section-header"><h4>Message Link</h4></div>
                 <div className="form-row">
                   <input className="input" placeholder="https://discord.com/channels/..." value={msg.messageLink} onChange={e => updateMsg({ messageLink: e.target.value })} />
-                  <button className="btn btn-sm btn-secondary" onClick={fetchMessage} disabled={!msg.messageLink || !activeWebhook?.url}>Load</button>
+                  <button className="btn btn-sm btn-primary" onClick={fetchMessage} disabled={!msg.messageLink || !activeWebhook?.url}>Load</button>
                 </div>
               </div>
 
