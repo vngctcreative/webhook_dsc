@@ -31,6 +31,8 @@
   --font: 'Segoe UI', 'Noto Sans', system-ui, -apple-system, sans-serif;
   --sidebar-width: 260px;
   --header-height: 48px;
+  --mention-background: rgba(88,101,242,0.3);
+  --mention-foreground: #dee0fc;
 }
 
 html, body, #root {
