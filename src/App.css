@@ -3,10 +3,10 @@
 
 .main-area {
   height: 100vh; display: grid;
-  grid-template-columns: 2fr 2fr 4fr 4fr;
+  grid-template-columns: 15fr 15fr 35fr 35fr;
   overflow: hidden;
 }
-.main-area.no-webhook { grid-template-columns: 2fr 2fr 4fr 0fr; }
+.main-area.no-webhook { grid-template-columns: 15fr 15fr 35fr 0fr; }
 .main-area.no-webhook .msg-sidebar { display: none; }
 .main-area.no-webhook .preview-panel { display: none; }
 
