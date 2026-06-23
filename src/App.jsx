@@ -239,6 +239,64 @@ export default function App() {
     setActiveMsgIdx(idx + 1)
   }
 
+  /* Config save/load */
+
+  function saveConfig() {
+    const config = {
+      version: 1,
+      webhooks: webhooks.map(w => ({ url: w.url, name: w.name })),
+      activeWebhookUrl: activeWebhook?.url || '',
+      messages: messages.map(m => ({
+        content: m.content,
+        username: m.username,
+        avatar_url: m.avatar_url,
+        embeds: m.embeds,
+        components: m.components,
+      })),
+      activeMsgIdx,
+    }
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'webhook-config.json'
+    a.click(); URL.revokeObjectURL(url)
+    setStatus({ type: 'success', text: 'Đã lưu config!' })
+  }
+
+  function loadConfig(file) {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const config = JSON.parse(e.target.result)
+        if (!config.version || !config.messages) {
+          setStatus({ type: 'error', text: 'File config không hợp lệ!' }); return
+        }
+        const now = Date.now()
+        const newWebhooks = config.webhooks
+          ? config.webhooks.map((w, i) => ({ ...w, id: (now + i).toString(36) }))
+          : []
+        setWebhooks(newWebhooks)
+        setMessages(config.messages.map((m, i) => ({
+          ...m,
+          id: (now + config.messages.length + i).toString(36),
+          filePreview: null,
+          embeds: m.embeds || [],
+          components: m.components || [],
+        })))
+        if (typeof config.activeMsgIdx === 'number') setActiveMsgIdx(config.activeMsgIdx)
+        if (config.activeWebhookUrl && newWebhooks.length > 0) {
+          const found = newWebhooks.find(w => w.url === config.activeWebhookUrl)
+          setActiveId(found ? found.id : newWebhooks[0].id)
+        }
+        setStatus({ type: 'success', text: 'Đã tải config thành công!' })
+      } catch (err) {
+        setStatus({ type: 'error', text: `Lỗi đọc file: ${err.message}` })
+      }
+    }
+    reader.readAsText(file)
+  }
+
   async function send() {
     if (!activeWebhook) return
     const enabled = document.querySelectorAll('.msg-check:checked')
@@ -341,6 +399,11 @@ export default function App() {
           ) : (
             <div className="editor-content">
               <div className="editor-toolbar">
+                <button className="btn btn-sm btn-secondary" onClick={saveConfig}>Lưu config</button>
+                <label className="btn btn-sm btn-secondary" style={{ cursor: 'pointer' }}>
+                  Tải config
+                  <input type="file" accept=".json" style={{ display: 'none' }} onChange={e => { loadConfig(e.target.files[0]); e.target.value = '' }} />
+                </label>
                 <button className="btn btn-sm btn-secondary" onClick={() => setStatus({ type: 'history', text: '' })}>Lịch sử ({history.length})</button>
               </div>
               {/* Profile */}
