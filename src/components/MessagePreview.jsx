@@ -1,17 +1,20 @@
-export default function MessagePreview({ msg, webhookName }) {
+export default function MessagePreview({ msg, webhookName, webhookAvatar }) {
   if (!msg) return null
 
   const hasEmbeds = msg.embeds?.length > 0 && msg.embeds.some(e => e.title || e.description || e.fields?.length > 0 || e.footerText || e.authorName || e.thumbnail || e.image)
   const hasComponents = msg.components?.length > 0 && msg.components.some(r => r.components?.length > 0)
 
+  const displayUsername = msg.username || webhookName || 'Webhook'
+  const displayAvatar = msg.avatar_url || webhookAvatar || ''
+
   return (
     <div className="discord-message">
       <div className="discord-avatar">
-        {msg.avatar_url ? <img src={msg.avatar_url} alt="" /> : (msg.username?.[0]?.toUpperCase() || 'W')}
+        {displayAvatar ? <img src={displayAvatar} alt="" /> : displayUsername[0]?.toUpperCase()}
       </div>
       <div className="discord-body">
         <div className="discord-header">
-          <span className="discord-username">{msg.username || webhookName || 'Webhook'}</span>
+          <span className="discord-username">{displayUsername}</span>
           <span className="discord-timestamp">{new Date().toLocaleString()}</span>
         </div>
         {msg.content && <div className="discord-content">{msg.content}</div>}

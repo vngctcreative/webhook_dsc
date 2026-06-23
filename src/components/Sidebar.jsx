@@ -62,7 +62,11 @@ export default function Sidebar({ webhooks, activeId, onSelect, onAdd, onRemove,
             onClick={() => onSelect(w.id)}
           >
             <div className="webhook-icon">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+              {w.avatar ? (
+                <img src={w.avatar} alt="" className="wh-avatar" />
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+              )}
             </div>
             <div className="webhook-info">
               {editingId === w.id ? (

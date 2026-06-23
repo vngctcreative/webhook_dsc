@@ -26,7 +26,8 @@
 .webhook-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--radius); cursor: pointer; margin-bottom: 2px; transition: background 0.1s; }
 .webhook-item:hover { background: var(--bg-hover); }
 .webhook-item.active { background: var(--bg-active); }
-.webhook-icon { color: var(--accent); flex-shrink: 0; display: flex; }
+.webhook-icon { color: var(--accent); flex-shrink: 0; display: flex; width: 20px; height: 20px; align-items: center; justify-content: center; }
+.wh-avatar { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; }
 .webhook-info { flex: 1; min-width: 0; }
 .webhook-name { display: block; font-size: 14px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .webhook-url { display: block; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -233,7 +234,8 @@ select.input { cursor: pointer; }
 .embed-footer-icon { width: 16px; height: 16px; border-radius: 50%; }
 
 /* ===== Editor Toolbar ===== */
-.editor-toolbar { display: flex; gap: 6px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.editor-toolbar { display: flex; gap: 6px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.editor-toolbar label.btn { margin: 0; }
 
 /* ===== History Panel ===== */
 .history-panel { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 12px; }

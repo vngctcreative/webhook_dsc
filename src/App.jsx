@@ -93,7 +93,7 @@ export default function App() {
   function addWebhook(url) {
     if (!url.trim()) return
     const id = Date.now().toString(36)
-    setWebhooks(prev => [...prev, { id, url: url.trim(), name: `Webhook ${prev.length + 1}` }])
+    setWebhooks(prev => [...prev, { id, url: url.trim(), name: `Webhook ${prev.length + 1}`, avatar: '' }])
     if (!activeId) setActiveId(id)
   }
 
@@ -244,7 +244,7 @@ export default function App() {
   function saveConfig() {
     const config = {
       version: 1,
-      webhooks: webhooks.map(w => ({ url: w.url, name: w.name })),
+      webhooks: webhooks.map(w => ({ url: w.url, name: w.name, avatar: w.avatar })),
       activeWebhookUrl: activeWebhook?.url || '',
       messages: messages.map(m => ({
         content: m.content,
@@ -406,12 +406,22 @@ export default function App() {
                 </label>
                 <button className="btn btn-sm btn-secondary" onClick={() => setStatus({ type: 'history', text: '' })}>Lịch sử ({history.length})</button>
               </div>
-              {/* Profile */}
+
+              {/* Webhook Settings */}
               <div className="editor-section">
-                <div className="section-header"><h4>Profile</h4></div>
+                <div className="section-header"><h4>Webhook Settings</h4></div>
                 <div className="profile-row">
-                  <input className="input" placeholder="Tên hiển thị" value={msg.username} onChange={e => updateMsg({ username: e.target.value })} />
-                  <input className="input" placeholder="Avatar URL" value={msg.avatar_url} onChange={e => updateMsg({ avatar_url: e.target.value })} />
+                  <input className="input" placeholder="Tên mặc định" value={activeWebhook?.name || ''} onChange={e => setWebhooks(prev => prev.map(w => w.id === activeId ? { ...w, name: e.target.value } : w))} />
+                  <input className="input" placeholder="Avatar URL mặc định" value={activeWebhook?.avatar || ''} onChange={e => setWebhooks(prev => prev.map(w => w.id === activeId ? { ...w, avatar: e.target.value } : w))} />
+                </div>
+              </div>
+
+              {/* Message Profile Override */}
+              <div className="editor-section">
+                <div className="section-header"><h4>Message Override Profile <span className="text-muted" style={{ fontWeight: 400, textTransform: 'none' }}>(để trống nếu dùng mặc định)</span></h4></div>
+                <div className="profile-row">
+                  <input className="input" placeholder="Ghi đè tên" value={msg.username} onChange={e => updateMsg({ username: e.target.value })} />
+                  <input className="input" placeholder="Ghi đè Avatar URL" value={msg.avatar_url} onChange={e => updateMsg({ avatar_url: e.target.value })} />
                 </div>
               </div>
 
@@ -577,7 +587,7 @@ export default function App() {
             <h4>Preview</h4>
           </div>
           <div className="preview-panel-body">
-            {msg && <MessagePreview msg={msg} webhookName={activeWebhook?.name} />}
+            {msg && <MessagePreview msg={msg} webhookName={activeWebhook?.name} webhookAvatar={activeWebhook?.avatar} />}
           </div>
         </div>
       </div>
