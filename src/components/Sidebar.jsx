@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 
-export default function Sidebar({ webhooks, activeId, onSelect, onAdd, onRemove, onRename }) {
+export default function Sidebar({ webhooks, activeId, onSelect, onAdd, onRemove, onRename, onSaveConfig, onLoadConfig }) {
   const [urlInput, setUrlInput] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [editName, setEditName] = useState('')
   const [collapsed, setCollapsed] = useState(false)
+  const fileRef = useRef(null)
 
   function handleAdd(e) {
     e.preventDefault()
@@ -91,6 +92,12 @@ export default function Sidebar({ webhooks, activeId, onSelect, onAdd, onRemove,
             >✕</button>
           </div>
         ))}
+      </div>
+
+      <div className="sidebar-config">
+        <button className="btn btn-sm btn-secondary config-btn" onClick={onSaveConfig}>Lưu config</button>
+        <button className="btn btn-sm btn-secondary config-btn" onClick={() => fileRef.current?.click()}>Tải config</button>
+        <input ref={fileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={e => { onLoadConfig(e.target.files[0]); e.target.value = '' }} />
       </div>
     </div>
   )

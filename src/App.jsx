@@ -305,7 +305,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <Sidebar webhooks={webhooks} activeId={activeId} onSelect={setActiveId} onAdd={addWebhook} onRemove={removeWebhook} onRename={renameWebhook} />
+      <Sidebar webhooks={webhooks} activeId={activeId} onSelect={setActiveId} onAdd={addWebhook} onRemove={removeWebhook} onRename={renameWebhook} onSaveConfig={saveConfig} onLoadConfig={loadConfig} />
 
       <div className={`main-area${!activeWebhook ? ' no-webhook' : ''}`}>
         <div className="msg-sidebar">
@@ -342,11 +342,6 @@ export default function App() {
           ) : (
             <div className="editor-content">
               <div className="editor-toolbar">
-                <button className="btn btn-sm btn-secondary" onClick={saveConfig}>Lưu config</button>
-                <label className="btn btn-sm btn-secondary" style={{ cursor: 'pointer' }}>
-                  Tải config
-                  <input type="file" accept=".json" style={{ display: 'none' }} onChange={e => { loadConfig(e.target.files[0]); e.target.value = '' }} />
-                </label>
                 <button className="btn btn-sm btn-secondary" onClick={() => setStatus({ type: 'history', text: '' })}>Lịch sử ({history.length})</button>
               </div>
 
