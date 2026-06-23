@@ -303,15 +303,25 @@ export default function App() {
         const formData = new FormData(); formData.append('payload_json', JSON.stringify(payload))
         const fileInput = document.querySelector(`.file-${m.id}`); const hasFile = fileInput?.files?.[0]
         if (hasFile) formData.append('file', hasFile)
-        const res = await fetch(activeWebhook.url, {
-          method: 'POST', body: hasFile ? formData : JSON.stringify(payload),
-          headers: hasFile ? {} : { 'Content-Type': 'application/json' },
-        })
+
+        const wh = extractWebhookParts(activeWebhook.url)
+        const mid = m.messageLink ? extractMessageId(m.messageLink) : null
+        const isUpdate = wh && mid
+
+        let url, opts
+        if (isUpdate) {
+          url = `https://discord.com/api/webhooks/${wh.id}/${wh.token}/messages/${mid}`
+          opts = { method: 'PATCH', body: hasFile ? formData : JSON.stringify(payload), headers: hasFile ? {} : { 'Content-Type': 'application/json' } }
+        } else {
+          url = activeWebhook.url
+          opts = { method: 'POST', body: hasFile ? formData : JSON.stringify(payload), headers: hasFile ? {} : { 'Content-Type': 'application/json' } }
+        }
+        const res = await fetch(url, opts)
         if (res.ok) { success++; setHistory(prev => [{ id: Date.now(), webhookName: activeWebhook.name, content: m.content, timestamp: new Date().toISOString(), status: 'success' }, ...prev].slice(0, 200)) }
         else { fail++; const err = await res.text(); setHistory(prev => [{ id: Date.now(), webhookName: activeWebhook.name, content: m.content, timestamp: new Date().toISOString(), status: 'error', error: err }, ...prev].slice(0, 200)) }
       } catch (err) { fail++ }
     }
-    if (fail === 0) setStatus({ type: 'success', text: `Đã gửi ${success} tin nhắn thành công!` })
+    if (fail === 0) setStatus({ type: 'success', text: `Đã ${toSend.every(m => m.messageLink) ? 'cập nhật' : 'gửi'} ${success} tin nhắn thành công!` })
     else setStatus({ type: 'error', text: `${success} thành công, ${fail} thất bại` })
     setSending(false)
   }
