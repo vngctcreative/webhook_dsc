@@ -233,34 +233,45 @@ export default function App() {
     updateWh(w => ({ ...w, activeMsgIdx: idx }))
   }
 
-  function exportWebhook() {
-    if (!activeWebhook) return
+  function saveConfig() {
     const data = {
-      version: 1, name: activeWebhook.name, avatar: activeWebhook.avatar,
-      messages: activeWebhook.messages.map(m => ({ content: m.content, embeds: m.embeds, components: m.components })),
+      version: 2,
+      webhooks: webhooks.map(w => ({
+        url: w.url, name: w.name, avatar: w.avatar,
+        messages: w.messages.map(m => ({ content: m.content, embeds: m.embeds, components: m.components })),
+        activeMsgIdx: w.activeMsgIdx,
+      })),
+      activeWebhookUrl: activeWebhook?.url || '',
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${activeWebhook.name}.json`
-    a.click(); setStatus({ type: 'success', text: `Đã xuất webhook "${activeWebhook.name}"!` })
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'webhook-config.json'
+    a.click(); setStatus({ type: 'success', text: 'Đã lưu config!' })
   }
 
-  function importWebhook(file) {
+  function loadConfig(file) {
     if (!file) return
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target.result)
-        if (!data.version || !data.messages) { setStatus({ type: 'error', text: 'File không hợp lệ!' }); return }
+        if (!data.version || !data.webhooks) { setStatus({ type: 'error', text: 'File không hợp lệ!' }); return }
         const now = Date.now()
-        const newWh = {
-          id: now.toString(36), url: '', name: data.name || 'Webhook', avatar: data.avatar || '',
-          messages: (data.messages || []).map((m, j) => ({
-            id: (now + 1 + j).toString(36), content: m.content || '', embeds: m.embeds || [], components: m.components || [], filePreview: null,
+        const newWebhooks = data.webhooks.map((w, i) => ({
+          id: (now + i).toString(36), url: w.url, name: w.name, avatar: w.avatar || '',
+          messages: (w.messages || []).map((m, j) => ({
+            id: (now + data.webhooks.length + j).toString(36),
+            content: m.content || '', embeds: m.embeds || [], components: m.components || [], filePreview: null,
           })),
-          activeMsgIdx: 0,
+          activeMsgIdx: w.activeMsgIdx ?? 0,
+        }))
+        setWebhooks(newWebhooks)
+        if (data.activeWebhookUrl) {
+          const found = newWebhooks.find(w => w.url === data.activeWebhookUrl)
+          setActiveId(found ? found.id : newWebhooks[0]?.id || '')
+        } else {
+          setActiveId(newWebhooks[0]?.id || '')
         }
-        setWebhooks(prev => [...prev, newWh]); setActiveId(newWh.id)
-        setStatus({ type: 'success', text: `Đã nhập webhook "${newWh.name}"!` })
+        setStatus({ type: 'success', text: `Đã tải config (${newWebhooks.length} webhooks)!` })
       } catch (err) { setStatus({ type: 'error', text: `Lỗi: ${err.message}` }) }
     }
     reader.readAsText(file)
@@ -331,10 +342,10 @@ export default function App() {
           ) : (
             <div className="editor-content">
               <div className="editor-toolbar">
-                <button className="btn btn-sm btn-secondary" onClick={exportWebhook}>Xuất webhook</button>
+                <button className="btn btn-sm btn-secondary" onClick={saveConfig}>Lưu config</button>
                 <label className="btn btn-sm btn-secondary" style={{ cursor: 'pointer' }}>
-                  Nhập webhook
-                  <input type="file" accept=".json" style={{ display: 'none' }} onChange={e => { importWebhook(e.target.files[0]); e.target.value = '' }} />
+                  Tải config
+                  <input type="file" accept=".json" style={{ display: 'none' }} onChange={e => { loadConfig(e.target.files[0]); e.target.value = '' }} />
                 </label>
                 <button className="btn btn-sm btn-secondary" onClick={() => setStatus({ type: 'history', text: '' })}>Lịch sử ({history.length})</button>
               </div>
