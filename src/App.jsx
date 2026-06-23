@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import Sidebar from './components/Sidebar'
 import MessagePreview from './components/MessagePreview'
 import './App.css'
@@ -13,88 +13,71 @@ const EMPTY_EMBED = () => ({
 const EMPTY_MSG = () => ({
   id: Date.now().toString(36),
   content: '',
-  username: '',
-  avatar_url: '',
   embeds: [],
   components: [],
-  file: null,
+  filePreview: null,
 })
 
 const BTN_STYLES = [
-  { value: 1, label: 'Blurple' },
-  { value: 2, label: 'Grey' },
-  { value: 3, label: 'Green' },
-  { value: 4, label: 'Red' },
-  { value: 5, label: 'Link' },
+  { value: 1, label: 'Blurple' }, { value: 2, label: 'Grey' },
+  { value: 3, label: 'Green' }, { value: 4, label: 'Red' }, { value: 5, label: 'Link' },
 ]
 
-function load(k, fb) {
-  try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb }
-  catch { return fb }
-}
+function load(k, fb) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb } catch { return fb } }
 
-function buildPayload(msg) {
+function buildPayload(msg, wh) {
   const p = {}
   if (msg.content) p.content = msg.content
-  if (msg.username) p.username = msg.username
-  if (msg.avatar_url) p.avatar_url = msg.avatar_url
   if (msg.embeds.length > 0) {
     p.embeds = msg.embeds.map(e => {
       const o = { ...e }
-      if (o.color) o.color = parseInt(String(o.color).replace('#', ''), 16)
-      else delete o.color
-      if (o.authorName) {
-        o.author = { name: o.authorName }
-        if (o.authorUrl) o.author.url = o.authorUrl
-        if (o.authorIcon) o.author.icon_url = o.authorIcon
-      }
+      if (o.color) o.color = parseInt(String(o.color).replace('#', ''), 16); else delete o.color
+      if (o.authorName) { o.author = { name: o.authorName }; if (o.authorUrl) o.author.url = o.authorUrl; if (o.authorIcon) o.author.icon_url = o.authorIcon }
       delete o.authorName; delete o.authorUrl; delete o.authorIcon
-      if (o.footerText) {
-        o.footer = { text: o.footerText }
-        if (o.footerIcon) o.footer.icon_url = o.footerIcon
-      }
+      if (o.footerText) { o.footer = { text: o.footerText }; if (o.footerIcon) o.footer.icon_url = o.footerIcon }
       delete o.footerText; delete o.footerIcon
-      if (!o.thumbnail) delete o.thumbnail
-      if (!o.image) delete o.image
-      if (!o.timestamp) delete o.timestamp
-      else o.timestamp = new Date().toISOString()
-      if (!o.title) delete o.title
-      if (!o.description) delete o.description
-      if (!o.url) delete o.url
+      if (!o.thumbnail) delete o.thumbnail; if (!o.image) delete o.image
+      if (!o.timestamp) delete o.timestamp; else o.timestamp = new Date().toISOString()
+      if (!o.title) delete o.title; if (!o.description) delete o.description; if (!o.url) delete o.url
       o.fields = (o.fields || []).filter(f => f.name || f.value)
       if (o.fields.length === 0) delete o.fields
       return o
     })
   }
-  if (msg.components.length > 0) {
-    p.components = msg.components
-  }
+  if (msg.components.length > 0) p.components = msg.components
   return p
 }
 
 export default function App() {
-  const [webhooks, setWebhooks] = useState(() => load('wh_webhooks', []))
-  const [activeId, setActiveId] = useState(() => load('wh_activeId', ''))
-  const [messages, setMessages] = useState(() => load('wh_messages', [EMPTY_MSG()]))
-  const [activeMsgIdx, setActiveMsgIdx] = useState(() => load('wh_activeMsg', 0))
+  const [webhooks, setWebhooks] = useState(() => {
+    const saved = load('wh_webhooks', [])
+    return saved.length > 0 ? saved : [{ id: '1', url: '', name: 'Webhook 1', avatar: '', messages: [EMPTY_MSG()], activeMsgIdx: 0 }]
+  })
+  const [activeId, setActiveId] = useState(() => {
+    const saved = load('wh_webhooks', [])
+    return saved.length > 0 ? (load('wh_activeId', '') || saved[0].id) : '1'
+  })
   const [sending, setSending] = useState(false)
   const [status, setStatus] = useState(null)
   const [history, setHistory] = useState(() => load('wh_history', []))
 
   useEffect(() => { localStorage.setItem('wh_webhooks', JSON.stringify(webhooks)) }, [webhooks])
   useEffect(() => { localStorage.setItem('wh_activeId', JSON.stringify(activeId)) }, [activeId])
-  useEffect(() => { localStorage.setItem('wh_messages', JSON.stringify(messages)) }, [messages])
-  useEffect(() => { localStorage.setItem('wh_activeMsg', JSON.stringify(activeMsgIdx)) }, [activeMsgIdx])
   useEffect(() => { localStorage.setItem('wh_history', JSON.stringify(history)) }, [history])
 
   const activeWebhook = webhooks.find(w => w.id === activeId)
+  const messages = activeWebhook?.messages || []
+  const activeMsgIdx = activeWebhook?.activeMsgIdx ?? 0
   const msg = messages[activeMsgIdx] || messages[0]
+
+  function updateWh(fn) { setWebhooks(prev => prev.map(w => w.id === activeId ? fn(w) : w)) }
+  function getMsg() { const w = webhooks.find(x => x.id === activeId); return (w?.messages || [])[w?.activeMsgIdx ?? 0] }
 
   function addWebhook(url) {
     if (!url.trim()) return
     const id = Date.now().toString(36)
-    setWebhooks(prev => [...prev, { id, url: url.trim(), name: `Webhook ${prev.length + 1}`, avatar: '' }])
-    if (!activeId) setActiveId(id)
+    setWebhooks(prev => [...prev, { id, url: url.trim(), name: `Webhook ${prev.length + 1}`, avatar: '', messages: [EMPTY_MSG()], activeMsgIdx: 0 }])
+    setActiveId(id)
   }
 
   function removeWebhook(id) {
@@ -105,162 +88,156 @@ export default function App() {
     }
   }
 
-  function renameWebhook(id, name) {
-    setWebhooks(prev => prev.map(w => w.id === id ? { ...w, name } : w))
-  }
+  function renameWebhook(id, name) { setWebhooks(prev => prev.map(w => w.id === id ? { ...w, name } : w)) }
 
   function updateMsg(updates) {
-    setMessages(prev => prev.map((m, i) => i === activeMsgIdx ? { ...m, ...updates } : m))
+    updateWh(w => {
+      const msgs = w.messages.map((m, i) => i === w.activeMsgIdx ? { ...m, ...updates } : m)
+      return { ...w, messages: msgs }
+    })
   }
 
   function addEmbed() {
-    const msg = messages[activeMsgIdx]
-    if (!msg) return
-    if (msg.embeds.length >= 10) return
-    updateMsg({ embeds: [...msg.embeds, EMPTY_EMBED()] })
+    updateWh(w => {
+      const m = w.messages[w.activeMsgIdx]
+      if (!m || m.embeds.length >= 10) return w
+      const msgs = w.messages.map((msg, i) => i === w.activeMsgIdx ? { ...msg, embeds: [...msg.embeds, EMPTY_EMBED()] } : msg)
+      return { ...w, messages: msgs }
+    })
   }
 
   function removeEmbed(idx) {
-    const msg = messages[activeMsgIdx]
-    if (!msg) return
-    updateMsg({ embeds: msg.embeds.filter((_, i) => i !== idx) })
+    updateWh(w => {
+      const m = w.messages[w.activeMsgIdx]
+      if (!m) return w
+      const msgs = w.messages.map((msg, i) => i === w.activeMsgIdx ? { ...msg, embeds: msg.embeds.filter((_, j) => j !== idx) } : msg)
+      return { ...w, messages: msgs }
+    })
   }
 
   function updateEmbed(idx, updates) {
-    const msg = messages[activeMsgIdx]
-    if (!msg) return
-    const embeds = msg.embeds.map((e, i) => i === idx ? { ...e, ...updates } : e)
-    updateMsg({ embeds })
+    updateWh(w => {
+      const m = w.messages[w.activeMsgIdx]
+      if (!m) return w
+      const embeds = m.embeds.map((e, i) => i === idx ? { ...e, ...updates } : e)
+      const msgs = w.messages.map((msg, i) => i === w.activeMsgIdx ? { ...msg, embeds } : msg)
+      return { ...w, messages: msgs }
+    })
   }
 
   function updateField(eIdx, fIdx, key, val) {
-    const msg = messages[activeMsgIdx]
-    if (!msg) return
-    const embeds = msg.embeds.map((e, i) => {
-      if (i !== eIdx) return e
-      const fields = e.fields.map((f, j) => j === fIdx ? { ...f, [key]: val } : f)
-      return { ...e, fields }
+    updateWh(w => {
+      const m = w.messages[w.activeMsgIdx]; if (!m) return w
+      const embeds = m.embeds.map((e, i) => i !== eIdx ? e : { ...e, fields: e.fields.map((f, j) => j === fIdx ? { ...f, [key]: val } : f) })
+      const msgs = w.messages.map((msg, i) => i === w.activeMsgIdx ? { ...msg, embeds } : msg)
+      return { ...w, messages: msgs }
     })
-    updateMsg({ embeds })
   }
 
   function addField(eIdx) {
-    const msg = messages[activeMsgIdx]
-    if (!msg) return
-    const embeds = msg.embeds.map((e, i) =>
-      i === eIdx ? { ...e, fields: [...e.fields, { name: '', value: '', inline: false }] } : e
-    )
-    updateMsg({ embeds })
+    updateWh(w => {
+      const m = w.messages[w.activeMsgIdx]; if (!m) return w
+      const embeds = m.embeds.map((e, i) => i === eIdx ? { ...e, fields: [...e.fields, { name: '', value: '', inline: false }] } : e)
+      const msgs = w.messages.map((msg, i) => i === w.activeMsgIdx ? { ...msg, embeds } : msg)
+      return { ...w, messages: msgs }
+    })
   }
 
   function removeField(eIdx, fIdx) {
-    const msg = messages[activeMsgIdx]
-    if (!msg) return
-    const embeds = msg.embeds.map((e, i) =>
-      i === eIdx ? { ...e, fields: e.fields.filter((_, j) => j !== fIdx) } : e
-    )
-    updateMsg({ embeds })
+    updateWh(w => {
+      const m = w.messages[w.activeMsgIdx]; if (!m) return w
+      const embeds = m.embeds.map((e, i) => i === eIdx ? { ...e, fields: e.fields.filter((_, j) => j !== fIdx) } : e)
+      const msgs = w.messages.map((msg, i) => i === w.activeMsgIdx ? { ...msg, embeds } : msg)
+      return { ...w, messages: msgs }
+    })
   }
 
-  /* Components */
   function addRow() {
-    const msg = messages[activeMsgIdx]
-    if (!msg) return
-    if (msg.components.length >= 5) return
-    updateMsg({ components: [...msg.components, { type: 1, components: [] }] })
+    updateWh(w => {
+      const m = w.messages[w.activeMsgIdx]; if (!m || m.components.length >= 5) return w
+      const msgs = w.messages.map((msg, i) => i === w.activeMsgIdx ? { ...msg, components: [...msg.components, { type: 1, components: [] }] } : msg)
+      return { ...w, messages: msgs }
+    })
   }
 
   function removeRow(rIdx) {
-    const msg = messages[activeMsgIdx]
-    if (!msg) return
-    updateMsg({ components: msg.components.filter((_, i) => i !== rIdx) })
+    updateWh(w => {
+      const m = w.messages[w.activeMsgIdx]; if (!m) return w
+      const msgs = w.messages.map((msg, i) => i === w.activeMsgIdx ? { ...msg, components: msg.components.filter((_, j) => j !== rIdx) } : msg)
+      return { ...w, messages: msgs }
+    })
   }
 
   function addButton(rIdx) {
-    const msg = messages[activeMsgIdx]
-    if (!msg) return
-    const comp = msg.components[rIdx]
-    if (!comp || comp.components.length >= 5) return
-    const rows = msg.components.map((r, i) =>
-      i === rIdx
-        ? { ...r, components: [...r.components, { type: 2, style: 2, label: 'Button', url: '', custom_id: '', emoji: '' }] }
-        : r
-    )
-    updateMsg({ components: rows })
+    updateWh(w => {
+      const m = w.messages[w.activeMsgIdx]; if (!m) return w
+      const comp = m.components[rIdx]; if (!comp || comp.components.length >= 5) return w
+      const rows = m.components.map((r, i) => i === rIdx ? { ...r, components: [...r.components, { type: 2, style: 2, label: 'Button', url: '', custom_id: '', emoji: '' }] } : r)
+      const msgs = w.messages.map((msg, i) => i === w.activeMsgIdx ? { ...msg, components: rows } : msg)
+      return { ...w, messages: msgs }
+    })
   }
 
   function updateButton(rIdx, bIdx, key, val) {
-    const msg = messages[activeMsgIdx]
-    if (!msg) return
-    const rows = msg.components.map((r, i) =>
-      i === rIdx
-        ? { ...r, components: r.components.map((b, j) => j === bIdx ? { ...b, [key]: val } : b) }
-        : r
-    )
-    updateMsg({ components: rows })
+    updateWh(w => {
+      const m = w.messages[w.activeMsgIdx]; if (!m) return w
+      const rows = m.components.map((r, i) => i === rIdx ? { ...r, components: r.components.map((b, j) => j === bIdx ? { ...b, [key]: val } : b) } : r)
+      const msgs = w.messages.map((msg, i) => i === w.activeMsgIdx ? { ...msg, components: rows } : msg)
+      return { ...w, messages: msgs }
+    })
   }
 
   function removeButton(rIdx, bIdx) {
-    const msg = messages[activeMsgIdx]
-    if (!msg) return
-    const rows = msg.components.map((r, i) =>
-      i === rIdx
-        ? { ...r, components: r.components.filter((_, j) => j !== bIdx) }
-        : r
-    )
-    updateMsg({ components: rows })
+    updateWh(w => {
+      const m = w.messages[w.activeMsgIdx]; if (!m) return w
+      const rows = m.components.map((r, i) => i === rIdx ? { ...r, components: r.components.filter((_, j) => j !== bIdx) } : r)
+      const msgs = w.messages.map((msg, i) => i === w.activeMsgIdx ? { ...msg, components: rows } : msg)
+      return { ...w, messages: msgs }
+    })
   }
 
-  /* Messages */
   function addMessage() {
-    const m = EMPTY_MSG()
-    m.id = Date.now().toString(36)
-    setMessages(prev => [...prev, m])
-    setActiveMsgIdx(messages.length)
+    updateWh(w => {
+      const m = EMPTY_MSG(); m.id = Date.now().toString(36)
+      return { ...w, messages: [...w.messages, m], activeMsgIdx: w.messages.length }
+    })
   }
 
   function removeMessage(idx) {
-    if (messages.length <= 1) return
-    setMessages(prev => prev.filter((_, i) => i !== idx))
-    if (activeMsgIdx >= idx && activeMsgIdx > 0) {
-      setActiveMsgIdx(activeMsgIdx - 1)
-    }
+    updateWh(w => {
+      if (w.messages.length <= 1) return w
+      const msgs = w.messages.filter((_, i) => i !== idx)
+      const newIdx = w.activeMsgIdx >= idx && w.activeMsgIdx > 0 ? w.activeMsgIdx - 1 : w.activeMsgIdx
+      return { ...w, messages: msgs, activeMsgIdx: Math.min(newIdx, msgs.length - 1) }
+    })
   }
 
   function duplicateMessage(idx) {
-    const m = messages[idx]
-    if (!m) return
-    const copy = { ...JSON.parse(JSON.stringify(m)), id: Date.now().toString(36) }
-    setMessages(prev => {
-      const n = [...prev]
-      n.splice(idx + 1, 0, copy)
-      return n
+    updateWh(w => {
+      const m = w.messages[idx]; if (!m) return w
+      const copy = { ...JSON.parse(JSON.stringify(m)), id: Date.now().toString(36) }
+      const msgs = [...w.messages]; msgs.splice(idx + 1, 0, copy)
+      return { ...w, messages: msgs, activeMsgIdx: idx + 1 }
     })
-    setActiveMsgIdx(idx + 1)
   }
 
-  /* Config save/load */
+  function setActiveMsgIdx(idx) {
+    updateWh(w => ({ ...w, activeMsgIdx: idx }))
+  }
 
   function saveConfig() {
     const config = {
       version: 1,
-      webhooks: webhooks.map(w => ({ url: w.url, name: w.name, avatar: w.avatar })),
-      activeWebhookUrl: activeWebhook?.url || '',
-      messages: messages.map(m => ({
-        content: m.content,
-        username: m.username,
-        avatar_url: m.avatar_url,
-        embeds: m.embeds,
-        components: m.components,
+      webhooks: webhooks.map(w => ({
+        url: w.url, name: w.name, avatar: w.avatar,
+        messages: w.messages.map(m => ({ content: m.content, embeds: m.embeds, components: m.components })),
+        activeMsgIdx: w.activeMsgIdx,
       })),
-      activeMsgIdx,
+      activeWebhookUrl: activeWebhook?.url || '',
     }
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = 'webhook-config.json'
-    a.click(); URL.revokeObjectURL(url)
-    setStatus({ type: 'success', text: 'Đã lưu config!' })
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'webhook-config.json'
+    a.click(); setStatus({ type: 'success', text: 'Đã lưu config!' })
   }
 
   function loadConfig(file) {
@@ -269,30 +246,25 @@ export default function App() {
     reader.onload = (e) => {
       try {
         const config = JSON.parse(e.target.result)
-        if (!config.version || !config.messages) {
-          setStatus({ type: 'error', text: 'File config không hợp lệ!' }); return
-        }
+        if (!config.version || !config.webhooks) { setStatus({ type: 'error', text: 'File không hợp lệ!' }); return }
         const now = Date.now()
-        const newWebhooks = config.webhooks
-          ? config.webhooks.map((w, i) => ({ ...w, id: (now + i).toString(36) }))
-          : []
+        const newWebhooks = config.webhooks.map((w, i) => ({
+          id: (now + i).toString(36), url: w.url, name: w.name, avatar: w.avatar || '',
+          messages: (w.messages || []).map((m, j) => ({
+            id: (now + config.webhooks.length + j).toString(36),
+            content: m.content || '', embeds: m.embeds || [], components: m.components || [], filePreview: null,
+          })),
+          activeMsgIdx: w.activeMsgIdx ?? 0,
+        }))
         setWebhooks(newWebhooks)
-        setMessages(config.messages.map((m, i) => ({
-          ...m,
-          id: (now + config.messages.length + i).toString(36),
-          filePreview: null,
-          embeds: m.embeds || [],
-          components: m.components || [],
-        })))
-        if (typeof config.activeMsgIdx === 'number') setActiveMsgIdx(config.activeMsgIdx)
-        if (config.activeWebhookUrl && newWebhooks.length > 0) {
+        if (config.activeWebhookUrl) {
           const found = newWebhooks.find(w => w.url === config.activeWebhookUrl)
           setActiveId(found ? found.id : newWebhooks[0].id)
+        } else {
+          setActiveId(newWebhooks[0]?.id || '')
         }
-        setStatus({ type: 'success', text: 'Đã tải config thành công!' })
-      } catch (err) {
-        setStatus({ type: 'error', text: `Lỗi đọc file: ${err.message}` })
-      }
+        setStatus({ type: 'success', text: 'Đã tải config!' })
+      } catch (err) { setStatus({ type: 'error', text: `Lỗi: ${err.message}` }) }
     }
     reader.readAsText(file)
   }
@@ -300,50 +272,24 @@ export default function App() {
   async function send() {
     if (!activeWebhook) return
     const enabled = document.querySelectorAll('.msg-check:checked')
-    const toSend = enabled.length > 0
-      ? messages.filter((_, i) => document.querySelector(`.msg-check-${i}`)?.checked)
-      : messages
-
+    const toSend = enabled.length > 0 ? messages.filter((_, i) => document.querySelector(`.msg-check-${i}`)?.checked) : messages
     if (toSend.length === 0) { setStatus({ type: 'error', text: 'Không có message nào được chọn' }); return }
-
-    setSending(true)
-    setStatus(null)
+    setSending(true); setStatus(null)
     let success = 0, fail = 0
-
-    for (const msg of toSend) {
-      const payload = buildPayload(msg)
+    for (const m of toSend) {
+      const payload = buildPayload(m)
       try {
-        const formData = new FormData()
-        formData.append('payload_json', JSON.stringify(payload))
-        const fileInput = document.querySelector(`.file-${msg.id}`)
-        const hasFile = fileInput?.files?.[0]
+        const formData = new FormData(); formData.append('payload_json', JSON.stringify(payload))
+        const fileInput = document.querySelector(`.file-${m.id}`); const hasFile = fileInput?.files?.[0]
         if (hasFile) formData.append('file', hasFile)
-
         const res = await fetch(activeWebhook.url, {
-          method: 'POST',
-          body: hasFile ? formData : JSON.stringify(payload),
+          method: 'POST', body: hasFile ? formData : JSON.stringify(payload),
           headers: hasFile ? {} : { 'Content-Type': 'application/json' },
         })
-
-        if (res.ok) {
-          success++
-          setHistory(prev => [{
-            id: Date.now(), webhookName: activeWebhook.name,
-            content: msg.content, timestamp: new Date().toISOString(), status: 'success',
-          }, ...prev].slice(0, 200))
-        } else {
-          fail++
-          const err = await res.text()
-          setHistory(prev => [{
-            id: Date.now(), webhookName: activeWebhook.name,
-            content: msg.content, timestamp: new Date().toISOString(), status: 'error', error: err,
-          }, ...prev].slice(0, 200))
-        }
-      } catch (err) {
-        fail++
-      }
+        if (res.ok) { success++; setHistory(prev => [{ id: Date.now(), webhookName: activeWebhook.name, content: m.content, timestamp: new Date().toISOString(), status: 'success' }, ...prev].slice(0, 200)) }
+        else { fail++; const err = await res.text(); setHistory(prev => [{ id: Date.now(), webhookName: activeWebhook.name, content: m.content, timestamp: new Date().toISOString(), status: 'error', error: err }, ...prev].slice(0, 200)) }
+      } catch (err) { fail++ }
     }
-
     if (fail === 0) setStatus({ type: 'success', text: `Đã gửi ${success} tin nhắn thành công!` })
     else setStatus({ type: 'error', text: `${success} thành công, ${fail} thất bại` })
     setSending(false)
@@ -351,17 +297,9 @@ export default function App() {
 
   return (
     <div className="app">
-      <Sidebar
-        webhooks={webhooks}
-        activeId={activeId}
-        onSelect={setActiveId}
-        onAdd={addWebhook}
-        onRemove={removeWebhook}
-        onRename={renameWebhook}
-      />
+      <Sidebar webhooks={webhooks} activeId={activeId} onSelect={setActiveId} onAdd={addWebhook} onRemove={removeWebhook} onRename={renameWebhook} />
 
       <div className="main-area">
-        {/* Messages list sidebar */}
         <div className="msg-sidebar">
           <div className="msg-sidebar-header">
             <h3>Messages ({messages.length})</h3>
@@ -377,16 +315,13 @@ export default function App() {
                 </div>
                 <div className="msg-list-actions">
                   <button className="btn-icon" onClick={e => { e.stopPropagation(); duplicateMessage(i) }} title="Duplicate">⧉</button>
-                  {messages.length > 1 && (
-                    <button className="btn-icon danger" onClick={e => { e.stopPropagation(); removeMessage(i) }} title="Xoá">✕</button>
-                  )}
+                  {messages.length > 1 && <button className="btn-icon danger" onClick={e => { e.stopPropagation(); removeMessage(i) }} title="Xoá">✕</button>}
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Editor */}
         <div className="editor">
           {!activeWebhook ? (
             <div className="empty-state">
@@ -407,7 +342,6 @@ export default function App() {
                 <button className="btn btn-sm btn-secondary" onClick={() => setStatus({ type: 'history', text: '' })}>Lịch sử ({history.length})</button>
               </div>
 
-              {/* Webhook Settings */}
               <div className="editor-section">
                 <div className="section-header"><h4>Webhook Settings</h4></div>
                 <div className="profile-row">
@@ -416,22 +350,15 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Content */}
               <div className="editor-section">
                 <div className="section-header"><h4>Content</h4></div>
                 <textarea className="input content-input" placeholder="Nhập nội dung tin nhắn..." rows={4} value={msg.content} onChange={e => updateMsg({ content: e.target.value })} />
                 <input type="file" className={`file-${msg.id}`} style={{ marginTop: 8, fontSize: 13 }} onChange={e => {
                   const file = e.target.files[0]
-                  if (file) {
-                    const url = URL.createObjectURL(file)
-                    updateMsg({ filePreview: url })
-                  } else {
-                    updateMsg({ filePreview: null })
-                  }
+                  updateMsg({ filePreview: file ? URL.createObjectURL(file) : null })
                 }} />
               </div>
 
-              {/* Embeds */}
               <div className="editor-section">
                 <div className="section-header">
                   <h4>Embeds ({msg.embeds.length}/10)</h4>
@@ -451,7 +378,6 @@ export default function App() {
                       </div>
                       <input className="input" placeholder="URL" value={embed.url} onChange={e => updateEmbed(ei, { url: e.target.value })} style={{ marginTop: 6 }} />
                       <textarea className="input" placeholder="Description" rows={2} value={embed.description} onChange={e => updateEmbed(ei, { description: e.target.value })} style={{ marginTop: 6 }} />
-
                       <details className="embed-details">
                         <summary>Author</summary>
                         <div className="form-row" style={{ marginTop: 6 }}>
@@ -460,7 +386,6 @@ export default function App() {
                         </div>
                         <input className="input" placeholder="Icon URL" value={embed.authorIcon} onChange={e => updateEmbed(ei, { authorIcon: e.target.value })} style={{ marginTop: 6 }} />
                       </details>
-
                       <details className="embed-details">
                         <summary>Fields ({embed.fields.length})</summary>
                         {embed.fields.map((f, fi) => (
@@ -473,7 +398,6 @@ export default function App() {
                         ))}
                         {embed.fields.length < 25 && <button className="btn btn-sm btn-secondary" onClick={() => addField(ei)} style={{ marginTop: 6 }}>+ Field</button>}
                       </details>
-
                       <details className="embed-details">
                         <summary>Footer & Media</summary>
                         <div className="form-row" style={{ marginTop: 6 }}>
@@ -486,8 +410,7 @@ export default function App() {
                         </div>
                         <label className="toggle-label" style={{ marginTop: 6 }}>
                           <input type="checkbox" checked={embed.timestamp} onChange={e => updateEmbed(ei, { timestamp: e.target.checked })} />
-                          <span className="toggle-switch"></span>
-                          Timestamp
+                          <span className="toggle-switch"></span> Timestamp
                         </label>
                       </details>
                     </div>
@@ -495,7 +418,6 @@ export default function App() {
                 ))}
               </div>
 
-              {/* Components / Buttons */}
               <div className="editor-section">
                 <div className="section-header">
                   <h4>Components ({msg.components.length}/5 rows)</h4>
@@ -534,7 +456,6 @@ export default function App() {
                 ))}
               </div>
 
-              {/* History panel */}
               {status?.type === 'history' && (
                 <div className="history-panel">
                   <div className="section-header"><h4>Lịch sử gửi ({history.length})</h4>
@@ -558,13 +479,10 @@ export default function App() {
                 </div>
               )}
 
-              {/* Send button */}
               {status && status.type !== 'history' && <div className={`status-bar ${status.type}`}>{status.type === 'success' ? '✓' : '✗'} {status.text}</div>}
 
               <button className="btn btn-primary btn-send" onClick={send} disabled={sending}>
-                {sending ? (
-                  <><span className="spinner"></span> Đang gửi...</>
-                ) : (
+                {sending ? (<><span className="spinner"></span> Đang gửi...</>) : (
                   <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg> Gửi {document.querySelectorAll('.msg-check:checked').length || messages.length} message(s)</>
                 )}
               </button>
@@ -572,11 +490,8 @@ export default function App() {
           )}
         </div>
 
-        {/* Preview */}
         <div className="preview-panel">
-          <div className="preview-panel-header">
-            <h4>Preview</h4>
-          </div>
+          <div className="preview-panel-header"><h4>Preview</h4></div>
           <div className="preview-panel-body">
             {msg && <MessagePreview msg={msg} webhookName={activeWebhook?.name} webhookAvatar={activeWebhook?.avatar} />}
           </div>
