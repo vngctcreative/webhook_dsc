@@ -307,9 +307,10 @@ export default function App() {
 
   return (
     <div className="app">
-      <Sidebar webhooks={webhooks} activeId={activeId} onSelect={setActiveId} onAdd={addWebhook} onRemove={removeWebhook} onRename={renameWebhook} onSaveConfig={saveConfig} onLoadConfig={loadConfig} />
 
       <div className={`main-area${!activeWebhook ? ' no-webhook' : ''}`}>
+        <Sidebar webhooks={webhooks} activeId={activeId} onSelect={setActiveId} onAdd={addWebhook} onRemove={removeWebhook} onRename={renameWebhook} onSaveConfig={saveConfig} onLoadConfig={loadConfig} />
+
         <div className="msg-sidebar">
           <div className="msg-sidebar-header">
             <h3>Messages ({messages.length})</h3>

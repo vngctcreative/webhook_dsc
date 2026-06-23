@@ -1,22 +1,22 @@
 /* ===== Layout ===== */
-.app { display: flex; height: 100vh; overflow: hidden; }
+.app { height: 100vh; overflow: hidden; display: grid; }
 
 .main-area {
-  flex: 1; display: grid;
-  grid-template-columns: 200px 1fr 380px;
-  min-width: 0; overflow: hidden;
+  height: 100vh; display: grid;
+  grid-template-columns: 2fr 2fr 4fr 4fr;
+  overflow: hidden;
 }
-.main-area.no-webhook { grid-template-columns: 200px 1fr 0fr; }
+.main-area.no-webhook { grid-template-columns: 2fr 2fr 4fr 0fr; }
 .main-area.no-webhook .msg-sidebar { display: none; }
 .main-area.no-webhook .preview-panel { display: none; }
 
 /* ===== Webhook Sidebar ===== */
 .sidebar {
-  width: var(--sidebar-width); background: var(--bg-secondary);
+  background: var(--bg-secondary);
   display: flex; flex-direction: column;
-  border-right: 1px solid var(--border); flex-shrink: 0;
+  border-right: 1px solid var(--border); min-width: 0; overflow: hidden;
 }
-.sidebar-collapsed { width: 48px; display: flex; align-items: flex-start; justify-content: center; padding-top: 12px; }
+.sidebar-collapsed { display: flex; align-items: flex-start; justify-content: center; padding-top: 12px; }
 .sidebar-header { padding: 16px 16px 8px; display: flex; align-items: center; justify-content: space-between; }
 .sidebar-header h2 { font-size: 15px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); }
 .sidebar-toggle { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: var(--radius-sm); display: flex; align-items: center; }
