@@ -426,8 +426,7 @@ export default function App() {
                 <div className="section-header"><h4>Message Link</h4></div>
                 <div className="form-row">
                   <input className="input" placeholder="https://discord.com/channels/..." value={msg.messageLink} onChange={e => updateMsg({ messageLink: e.target.value })} />
-                  <button className="btn btn-sm btn-secondary" onClick={fetchMessage} disabled={!msg.messageLink || !activeWebhook?.url}>Tải</button>
-                  <button className="btn btn-sm btn-primary" onClick={updateMessage} disabled={!msg.messageLink || !activeWebhook?.url}>Cập nhật</button>
+                  <button className="btn btn-sm btn-secondary" onClick={fetchMessage} disabled={!msg.messageLink || !activeWebhook?.url}>Load</button>
                 </div>
               </div>
 
@@ -555,7 +554,7 @@ export default function App() {
 
               <button className="btn btn-primary btn-send" onClick={send} disabled={sending}>
                 {sending ? (<><span className="spinner"></span> Đang gửi...</>) : (
-                  <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg> Gửi {document.querySelectorAll('.msg-check:checked').length || messages.length} message(s)</>
+                  <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg> Cập nhật tin nhắn</>
                 )}
               </button>
             </div>
