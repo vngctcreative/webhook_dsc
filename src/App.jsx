@@ -28,6 +28,8 @@ function load(k, fb) { try { const v = localStorage.getItem(k); return v ? JSON.
 function buildPayload(msg, wh) {
   const p = {}
   if (msg.content) p.content = msg.content
+  if (wh?.name) p.username = wh.name
+  if (wh?.avatar) p.avatar_url = wh.avatar
   if (msg.embeds.length > 0) {
     p.embeds = msg.embeds.map(e => {
       const o = { ...e }
@@ -285,7 +287,7 @@ export default function App() {
     setSending(true); setStatus(null)
     let success = 0, fail = 0
     for (const m of toSend) {
-      const payload = buildPayload(m)
+      const payload = buildPayload(m, activeWebhook)
       try {
         const formData = new FormData(); formData.append('payload_json', JSON.stringify(payload))
         const fileInput = document.querySelector(`.file-${m.id}`); const hasFile = fileInput?.files?.[0]
