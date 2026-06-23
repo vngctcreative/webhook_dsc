@@ -51,11 +51,16 @@ function buildPayload(msg, wh) {
 export default function App() {
   const [webhooks, setWebhooks] = useState(() => {
     const saved = load('wh_webhooks', [])
-    return saved.length > 0 ? saved : [{ id: '1', url: '', name: 'Webhook 1', avatar: '', messages: [EMPTY_MSG()], activeMsgIdx: 0 }]
+    if (saved.length === 0) return [{ id: '1', url: '', name: 'Webhook 1', avatar: '', messages: [EMPTY_MSG()], activeMsgIdx: 0 }]
+    return saved.map(w => ({
+      ...w, avatar: w.avatar || '', messages: w.messages || [EMPTY_MSG()], activeMsgIdx: w.activeMsgIdx ?? 0,
+    }))
   })
   const [activeId, setActiveId] = useState(() => {
     const saved = load('wh_webhooks', [])
-    return saved.length > 0 ? (load('wh_activeId', '') || saved[0].id) : '1'
+    if (saved.length === 0) return '1'
+    const lastId = load('wh_activeId', '') || saved[0].id
+    return saved.some(w => w.id === lastId) ? lastId : saved[0].id
   })
   const [sending, setSending] = useState(false)
   const [status, setStatus] = useState(null)
@@ -64,6 +69,8 @@ export default function App() {
   useEffect(() => { localStorage.setItem('wh_webhooks', JSON.stringify(webhooks)) }, [webhooks])
   useEffect(() => { localStorage.setItem('wh_activeId', JSON.stringify(activeId)) }, [activeId])
   useEffect(() => { localStorage.setItem('wh_history', JSON.stringify(history)) }, [history])
+  /* Clear old localStorage keys from previous versions */
+  useEffect(() => { ['wh_messages','wh_activeMsg','wh_draftMsg','wh_draftUser','wh_draftAvatar','wh_draftEmbed','wh_includeEmbed'].forEach(k => localStorage.removeItem(k)) }, [])
 
   const activeWebhook = webhooks.find(w => w.id === activeId)
   const messages = activeWebhook?.messages || []
@@ -197,6 +204,7 @@ export default function App() {
   }
 
   function addMessage() {
+    if (!activeWebhook) return
     updateWh(w => {
       const m = EMPTY_MSG(); m.id = Date.now().toString(36)
       return { ...w, messages: [...w.messages, m], activeMsgIdx: w.messages.length }
@@ -288,7 +296,7 @@ export default function App() {
     <div className="app">
       <Sidebar webhooks={webhooks} activeId={activeId} onSelect={setActiveId} onAdd={addWebhook} onRemove={removeWebhook} onRename={renameWebhook} />
 
-      <div className="main-area">
+      <div className={`main-area${!activeWebhook ? ' no-webhook' : ''}`}>
         <div className="msg-sidebar">
           <div className="msg-sidebar-header">
             <h3>Messages ({messages.length})</h3>

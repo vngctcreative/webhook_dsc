@@ -6,6 +6,9 @@
   grid-template-columns: 200px 1fr 380px;
   min-width: 0; overflow: hidden;
 }
+.main-area.no-webhook { grid-template-columns: 200px 1fr 0fr; }
+.main-area.no-webhook .msg-sidebar { display: none; }
+.main-area.no-webhook .preview-panel { display: none; }
 
 /* ===== Webhook Sidebar ===== */
 .sidebar {
