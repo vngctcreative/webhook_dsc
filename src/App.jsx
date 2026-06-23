@@ -416,15 +416,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Message Profile Override */}
-              <div className="editor-section">
-                <div className="section-header"><h4>Message Override Profile <span className="text-muted" style={{ fontWeight: 400, textTransform: 'none' }}>(để trống nếu dùng mặc định)</span></h4></div>
-                <div className="profile-row">
-                  <input className="input" placeholder="Ghi đè tên" value={msg.username} onChange={e => updateMsg({ username: e.target.value })} />
-                  <input className="input" placeholder="Ghi đè Avatar URL" value={msg.avatar_url} onChange={e => updateMsg({ avatar_url: e.target.value })} />
-                </div>
-              </div>
-
               {/* Content */}
               <div className="editor-section">
                 <div className="section-header"><h4>Content</h4></div>
