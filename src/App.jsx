@@ -16,6 +16,7 @@ const EMPTY_MSG = () => ({
   embeds: [],
   components: [],
   filePreview: null,
+  messageLink: '',
 })
 
 const BTN_STYLES = [
@@ -48,6 +49,16 @@ function buildPayload(msg, wh) {
   }
   if (msg.components.length > 0) p.components = msg.components
   return p
+}
+
+function extractWebhookParts(url) {
+  const m = url.match(/\/webhooks\/(\d+)\/([^/\s?#]+)/)
+  return m ? { id: m[1], token: m[2] } : null
+}
+
+function extractMessageId(link) {
+  const m = link.match(/(?:channels\/\d+\/\d+\/)?(\d+)$/)
+  return m ? m[1] : null
 }
 
 export default function App() {
@@ -305,6 +316,52 @@ export default function App() {
     setSending(false)
   }
 
+  async function fetchMessage() {
+    if (!activeWebhook?.url || !msg?.messageLink) return
+    const wh = extractWebhookParts(activeWebhook.url)
+    const mid = extractMessageId(msg.messageLink)
+    if (!wh || !mid) { setStatus({ type: 'error', text: 'Link webhook hoặc message không hợp lệ!' }); return }
+    setStatus({ type: 'info', text: 'Đang tải...' })
+    try {
+      const res = await fetch(`https://discord.com/api/webhooks/${wh.id}/${wh.token}/messages/${mid}`)
+      if (!res.ok) { setStatus({ type: 'error', text: `Lỗi khi tải: ${res.status}` }); return }
+      const d = await res.json()
+      const embeds = (d.embeds || []).map(e => ({
+        title: e.title || '', description: e.description || '', url: e.url || '', color: e.color ? '#' + e.color.toString(16).padStart(6, '0') : '#5865f2',
+        authorName: e.author?.name || '', authorUrl: e.author?.url || '', authorIcon: e.author?.icon_url || '',
+        footerText: e.footer?.text || '', footerIcon: e.footer?.icon_url || '',
+        thumbnail: e.thumbnail?.url || '', image: e.image?.url || '',
+        fields: (e.fields || []).map(f => ({ name: f.name || '', value: f.value || '', inline: f.inline || false })),
+        timestamp: !!e.timestamp,
+      }))
+      updateMsg({
+        content: d.content || '',
+        embeds,
+        components: d.components || [],
+        filePreview: d.attachments?.[0]?.url || null,
+      })
+      setStatus({ type: 'success', text: 'Đã tải nội dung từ message!' })
+    } catch (err) { setStatus({ type: 'error', text: `Lỗi: ${err.message}` }) }
+  }
+
+  async function updateMessage() {
+    if (!activeWebhook?.url || !msg?.messageLink) return
+    const wh = extractWebhookParts(activeWebhook.url)
+    const mid = extractMessageId(msg.messageLink)
+    if (!wh || !mid) { setStatus({ type: 'error', text: 'Link webhook hoặc message không hợp lệ!' }); return }
+    setStatus({ type: 'info', text: 'Đang cập nhật...' })
+    const payload = buildPayload(msg, activeWebhook)
+    try {
+      const res = await fetch(`https://discord.com/api/webhooks/${wh.id}/${wh.token}/messages/${mid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (res.ok) setStatus({ type: 'success', text: 'Đã cập nhật message!' })
+      else { const err = await res.text(); setStatus({ type: 'error', text: `Lỗi: ${err}` }) }
+    } catch (err) { setStatus({ type: 'error', text: `Lỗi: ${err.message}` }) }
+  }
+
   return (
     <div className="app">
 
@@ -363,6 +420,15 @@ export default function App() {
                   const file = e.target.files[0]
                   updateMsg({ filePreview: file ? URL.createObjectURL(file) : null })
                 }} />
+              </div>
+
+              <div className="editor-section">
+                <div className="section-header"><h4>Message Link</h4></div>
+                <div className="form-row">
+                  <input className="input" placeholder="https://discord.com/channels/..." value={msg.messageLink} onChange={e => updateMsg({ messageLink: e.target.value })} />
+                  <button className="btn btn-sm btn-secondary" onClick={fetchMessage} disabled={!msg.messageLink || !activeWebhook?.url}>Tải</button>
+                  <button className="btn btn-sm btn-primary" onClick={updateMessage} disabled={!msg.messageLink || !activeWebhook?.url}>Cập nhật</button>
+                </div>
               </div>
 
               <div className="editor-section">
