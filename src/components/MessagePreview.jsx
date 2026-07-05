@@ -19,33 +19,35 @@ function renderContent(text) {
       return <img key={i} className="discord-emoji" src={`https://cdn.discordapp.com/emojis/${emojiMatch[2]}.${isAnimated ? 'gif' : 'png'}`} alt={`:${emojiMatch[1]}:`} title={emojiMatch[1]} />
     }
 
-    return renderMarkdown(part, i)
+    return renderMarkdown(part)
   })
 }
 
-function renderMarkdown(text, startKey) {
+function renderMarkdown(text) {
+  if (!text) return null
   const patterns = [
-    { re: /\*\*\*(.+?)\*\*\*/g, wrap: (s, k) => <em key={k}><strong>{s}</strong></em> },
-    { re: /\*\*(.+?)\*\*/g, wrap: (s, k) => <strong key={k}>{s}</strong> },
-    { re: /\*(.+?)\*/g, wrap: (s, k) => <em key={k}>{s}</em> },
-    { re: /__(.+?)__/g, wrap: (s, k) => <u key={k}>{s}</u> },
-    { re: /~~(.+?)~~/g, wrap: (s, k) => <s key={k}>{s}</s> },
-    { re: /\|\|(.+?)\|\|/g, wrap: (s, k) => <span key={k} className="discord-spoiler">{s}</span> },
-    { re: /`([^`]+)`/g, wrap: (s, k) => <code key={k} className="discord-code">{s}</code> },
+    { re: /\*\*\*(.+?)\*\*\*/, wrap: (s, k) => <em key={k}><strong>{s}</strong></em> },
+    { re: /\*\*(.+?)\*\*/, wrap: (s, k) => <strong key={k}>{s}</strong> },
+    { re: /\*(.+?)\*/, wrap: (s, k) => <em key={k}>{s}</em> },
+    { re: /__(.+?)__/, wrap: (s, k) => <u key={k}>{s}</u> },
+    { re: /~~(.+?)~~/, wrap: (s, k) => <s key={k}>{s}</s> },
+    { re: /\|\|(.+?)\|\|/, wrap: (s, k) => <span key={k} className="discord-spoiler">{s}</span> },
+    { re: /`([^`]+)`/, wrap: (s, k) => <code key={k} className="discord-code">{s}</code> },
   ]
-
-  const combined = patterns.map(p => `(${p.re.source.slice(1,-1)})`).join('|')
-  const re = new RegExp(combined, 'g')
-  const parts = text.split(re)
-  let key = startKey
-  return parts.map((part, i) => {
-    if (!part) return null
+  const result = []
+  let remaining = text, key = 0
+  while (remaining) {
+    let bestIdx = -1, bestMatch = null, bestPat = null
     for (const p of patterns) {
-      const m = part.match(p.re)
-      if (m) return p.wrap(m[1], key++)
+      const m = remaining.match(p.re)
+      if (m && (bestIdx === -1 || m.index < bestIdx)) { bestIdx = m.index; bestMatch = m; bestPat = p }
     }
-    return <span key={key++}>{part}</span>
-  }) ?? text
+    if (!bestMatch) { result.push(<span key={key++}>{remaining}</span>); break }
+    if (bestIdx > 0) result.push(<span key={key++}>{remaining.slice(0, bestIdx)}</span>)
+    result.push(bestPat.wrap(bestMatch[1], key++))
+    remaining = remaining.slice(bestIdx + bestMatch[0].length)
+  }
+  return result
 }
 
 export default function MessagePreview({ msg, webhookName, webhookAvatar }) {
