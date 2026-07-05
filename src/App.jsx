@@ -301,7 +301,7 @@ export default function App() {
       const payload = buildPayload(m, activeWebhook)
       try {
         const formData = new FormData()
-        formData.append('payload_json', new Blob([JSON.stringify(payload)], { type: 'application/json' }))
+        formData.append('payload_json', JSON.stringify(payload))
         const fileInput = document.querySelector(`.file-${m.id}`); const hasFile = fileInput?.files?.[0]
         if (hasFile) formData.append('file', fileInput.files[0])
 
@@ -357,7 +357,7 @@ export default function App() {
     const payload = buildPayload(msg, activeWebhook)
     try {
       const formData = new FormData()
-      formData.append('payload_json', new Blob([JSON.stringify(payload)], { type: 'application/json' }))
+      formData.append('payload_json', JSON.stringify(payload))
       const res = await fetch(`https://discord.com/api/webhooks/${wh.id}/${wh.token}/messages/${mid}`, { method: 'PATCH', body: formData })
       if (res.ok) setStatus({ type: 'success', text: 'Đã cập nhật message!' })
       else { const err = await res.text(); setStatus({ type: 'error', text: `Lỗi: ${err}` }) }
