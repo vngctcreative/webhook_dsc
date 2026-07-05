@@ -596,13 +596,30 @@ const TS_FORMATS = [
 
 function TimestampGenerator() {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 16))
-  const [format, setFormat] = useState('f')
 
-  const unix = Math.floor(new Date(date).getTime() / 1000)
-  const ts = format === 'f' ? `<t:${unix}>` : `<t:${unix}:${format}>`
+  const d = new Date(date)
+  const unix = Math.floor(d.getTime() / 1000)
 
-  function copy() {
-    navigator.clipboard.writeText(ts)
+  function ts(fmt) {
+    const t = fmt === 'f' ? `<t:${unix}>` : `<t:${unix}:${fmt}>`
+    return t
+  }
+
+  function preview(fmt) {
+    switch (fmt) {
+      case 't': return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+      case 'T': return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })
+      case 'd': return d.toLocaleDateString('en-US')
+      case 'D': return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      case 'f': return `${d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+      case 'F': return `${d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}`
+      case 'R': { const s = Math.floor((d - new Date()) / 1000); const a = Math.abs(s); const r = a < 60 ? `${a}s ago` : a < 3600 ? `${Math.floor(a/60)}m ago` : a < 86400 ? `${Math.floor(a/3600)}h ago` : a < 2592000 ? `${Math.floor(a/86400)}d ago` : a < 31536000 ? `${Math.floor(a/2592000)}mo ago` : `${Math.floor(a/31536000)}y ago`; return s > 0 ? r : r.replace('ago', 'from now') }
+      default: return ''
+    }
+  }
+
+  function copy(fmt) {
+    navigator.clipboard.writeText(ts(fmt))
   }
 
   return (
@@ -612,16 +629,15 @@ function TimestampGenerator() {
         <input type="datetime-local" className="input" value={date} onChange={e => setDate(e.target.value)} />
         <button className="btn btn-sm btn-secondary" onClick={() => setDate(new Date().toISOString().slice(0, 16))}>Now</button>
       </div>
-      <div className="ts-formats">
+      <div className="ts-list">
         {TS_FORMATS.map(f => (
-          <button key={f.id} className={`btn btn-sm ${format === f.id ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFormat(f.id)} title={f.ex}>
-            {f.id}
-          </button>
+          <div key={f.id} className="ts-row">
+            <span className="ts-badge">{f.id}</span>
+            <span className="ts-preview">{preview(f.id)}</span>
+            <code className="ts-code">{ts(f.id)}</code>
+            <button className="btn btn-sm btn-primary" onClick={() => copy(f.id)}>Copy</button>
+          </div>
         ))}
-      </div>
-      <div className="ts-result">
-        <code className="ts-code">{ts}</code>
-        <button className="btn btn-sm btn-primary" onClick={copy}>Copy</button>
       </div>
     </div>
   )
