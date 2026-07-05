@@ -300,23 +300,17 @@ export default function App() {
     for (const m of toSend) {
       const payload = buildPayload(m, activeWebhook)
       try {
-        const formData = new FormData(); formData.append('payload_json', JSON.stringify(payload))
+        const formData = new FormData()
+        formData.append('payload_json', new Blob([JSON.stringify(payload)], { type: 'application/json' }))
         const fileInput = document.querySelector(`.file-${m.id}`); const hasFile = fileInput?.files?.[0]
-        if (hasFile) formData.append('file', hasFile)
+        if (hasFile) formData.append('file', fileInput.files[0])
 
         const wh = extractWebhookParts(activeWebhook.url)
         const mid = m.messageLink ? extractMessageId(m.messageLink) : null
         const isUpdate = wh && mid
 
-        let url, opts
-        if (isUpdate) {
-          url = `https://discord.com/api/webhooks/${wh.id}/${wh.token}/messages/${mid}`
-          opts = { method: 'PATCH', body: hasFile ? formData : JSON.stringify(payload), headers: hasFile ? {} : { 'Content-Type': 'application/json' } }
-        } else {
-          url = activeWebhook.url
-          opts = { method: 'POST', body: hasFile ? formData : JSON.stringify(payload), headers: hasFile ? {} : { 'Content-Type': 'application/json' } }
-        }
-        const res = await fetch(url, opts)
+        const url = isUpdate ? `https://discord.com/api/webhooks/${wh.id}/${wh.token}/messages/${mid}` : activeWebhook.url
+        const res = await fetch(url, { method: isUpdate ? 'PATCH' : 'POST', body: formData })
         if (res.ok) { success++; setHistory(prev => [{ id: Date.now(), webhookName: activeWebhook.name, content: m.content, timestamp: new Date().toISOString(), status: 'success' }, ...prev].slice(0, 200)) }
         else { fail++; const err = await res.text(); setHistory(prev => [{ id: Date.now(), webhookName: activeWebhook.name, content: m.content, timestamp: new Date().toISOString(), status: 'error', error: err }, ...prev].slice(0, 200)) }
       } catch (err) { fail++ }
@@ -362,11 +356,9 @@ export default function App() {
     setStatus({ type: 'info', text: 'Đang cập nhật...' })
     const payload = buildPayload(msg, activeWebhook)
     try {
-      const res = await fetch(`https://discord.com/api/webhooks/${wh.id}/${wh.token}/messages/${mid}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
+      const formData = new FormData()
+      formData.append('payload_json', new Blob([JSON.stringify(payload)], { type: 'application/json' }))
+      const res = await fetch(`https://discord.com/api/webhooks/${wh.id}/${wh.token}/messages/${mid}`, { method: 'PATCH', body: formData })
       if (res.ok) setStatus({ type: 'success', text: 'Đã cập nhật message!' })
       else { const err = await res.text(); setStatus({ type: 'error', text: `Lỗi: ${err}` }) }
     } catch (err) { setStatus({ type: 'error', text: `Lỗi: ${err.message}` }) }
