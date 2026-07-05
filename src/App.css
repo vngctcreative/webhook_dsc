@@ -223,6 +223,13 @@
 .discord-btn.style-5:hover { background: rgba(0,168,252,0.1); }
 .discord-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* ===== Timestamp Generator ===== */
+.ts-generator { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.ts-formats { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+.ts-formats .btn { font-family: 'Consolas', monospace; min-width: 28px; text-align: center; }
+.ts-result { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.ts-code { background: var(--bg-input); color: var(--text-primary); padding: 6px 10px; border-radius: var(--radius-sm); font-size: 13px; font-family: 'Consolas', monospace; flex: 1; word-break: break-all; border: 1px solid var(--border); }
+
 /* ===== Buttons ===== */
 .btn { display: inline-flex; align-items: center; gap: 6px; border: none; border-radius: var(--radius-sm); font-weight: 500; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }

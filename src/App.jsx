@@ -567,6 +567,8 @@ export default function App() {
                   <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg> {msg?.messageLink ? 'Cập nhật tin nhắn' : `Gửi ${document.querySelectorAll('.msg-check:checked').length || messages.length} message(s)`}</>
                 )}
               </button>
+
+              <TimestampGenerator />
             </div>
           )}
         </div>
@@ -577,6 +579,49 @@ export default function App() {
             {msg && <MessagePreview msg={msg} webhookName={activeWebhook?.name} webhookAvatar={activeWebhook?.avatar} />}
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+const TS_FORMATS = [
+  { id: 't', label: 'Short Time', ex: '12:00 PM' },
+  { id: 'T', label: 'Long Time', ex: '12:00:00 PM' },
+  { id: 'd', label: 'Short Date', ex: '12/01/2024' },
+  { id: 'D', label: 'Long Date', ex: 'December 1, 2024' },
+  { id: 'f', label: 'Short Date/Time', ex: 'December 1, 2024 12:00 PM' },
+  { id: 'F', label: 'Long Date/Time', ex: 'Monday, December 1, 2024 12:00 PM' },
+  { id: 'R', label: 'Relative', ex: '2 months ago' },
+]
+
+function TimestampGenerator() {
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 16))
+  const [format, setFormat] = useState('f')
+
+  const unix = Math.floor(new Date(date).getTime() / 1000)
+  const ts = format === 'f' ? `<t:${unix}>` : `<t:${unix}:${format}>`
+
+  function copy() {
+    navigator.clipboard.writeText(ts)
+  }
+
+  return (
+    <div className="editor-section ts-generator">
+      <div className="section-header"><h4>Discord Timestamp</h4></div>
+      <div className="form-row">
+        <input type="datetime-local" className="input" value={date} onChange={e => setDate(e.target.value)} />
+        <button className="btn btn-sm btn-secondary" onClick={() => setDate(new Date().toISOString().slice(0, 16))}>Now</button>
+      </div>
+      <div className="ts-formats">
+        {TS_FORMATS.map(f => (
+          <button key={f.id} className={`btn btn-sm ${format === f.id ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFormat(f.id)} title={f.ex}>
+            {f.id}
+          </button>
+        ))}
+      </div>
+      <div className="ts-result">
+        <code className="ts-code">{ts}</code>
+        <button className="btn btn-sm btn-primary" onClick={copy}>Copy</button>
       </div>
     </div>
   )
