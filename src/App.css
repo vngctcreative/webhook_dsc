@@ -159,6 +159,10 @@
 
 /* ===== Discord Mentions ===== */
 .discord-mention { color: var(--mention-foreground, #dee0fc); background: var(--mention-background, rgba(88,101,242,0.3)); padding: 0 3px; border-radius: 3px; font-weight: 500; cursor: pointer; }
+.discord-emoji { width: 22px; height: 22px; vertical-align: middle; object-fit: contain; margin: 0 1px; }
+.discord-spoiler { background: #202225; border-radius: 3px; padding: 0 2px; cursor: pointer; }
+.discord-spoiler:hover { background: rgba(32,34,37,0.8); }
+.discord-code { background: #1e1f22; color: #dbdee1; padding: 1px 4px; border-radius: 3px; font-size: 13px; font-family: 'Consolas','Courier New',monospace; }
 
 /* ===== File Attachment ===== */
 .discord-file-attach {

@@ -1,14 +1,51 @@
 function renderContent(text) {
   if (!text) return null
-  const parts = text.split(/(@everyone|@here|<@!?\d+>|<@&\d+>|<\d+>)/g)
+
+  const emojiRe = /(<a?:\w+:\d+>)/g
+  const mentionRe = /(@everyone|@here|<@!?\d+>|<@&\d+>|<\d+>)/g
+  const parts = text.split(new RegExp(`(${mentionRe.source.slice(1,-1)}|${emojiRe.source.slice(1,-1)})`, 'g'))
+
   return parts.map((part, i) => {
+    if (!part) return null
     if (part === '@everyone') return <span key={i} className="discord-mention">@everyone</span>
     if (part === '@here') return <span key={i} className="discord-mention">@here</span>
     if (/^<@!?\d+>$/.test(part)) return <span key={i} className="discord-mention">{part}</span>
     if (/^<@&\d+>$/.test(part)) return <span key={i} className="discord-mention">{part}</span>
     if (/^<#?\d+>$/.test(part)) return <span key={i} className="discord-mention">{part}</span>
-    return part
+
+    const emojiMatch = part.match(/^<a?:(\w+):(\d+)>$/)
+    if (emojiMatch) {
+      const isAnimated = part.startsWith('<a')
+      return <img key={i} className="discord-emoji" src={`https://cdn.discordapp.com/emojis/${emojiMatch[2]}.${isAnimated ? 'gif' : 'png'}`} alt={`:${emojiMatch[1]}:`} title={emojiMatch[1]} />
+    }
+
+    return renderMarkdown(part, i)
   })
+}
+
+function renderMarkdown(text, startKey) {
+  const patterns = [
+    { re: /\*\*\*(.+?)\*\*\*/g, wrap: (s, k) => <em key={k}><strong>{s}</strong></em> },
+    { re: /\*\*(.+?)\*\*/g, wrap: (s, k) => <strong key={k}>{s}</strong> },
+    { re: /\*(.+?)\*/g, wrap: (s, k) => <em key={k}>{s}</em> },
+    { re: /__(.+?)__/g, wrap: (s, k) => <u key={k}>{s}</u> },
+    { re: /~~(.+?)~~/g, wrap: (s, k) => <s key={k}>{s}</s> },
+    { re: /\|\|(.+?)\|\|/g, wrap: (s, k) => <span key={k} className="discord-spoiler">{s}</span> },
+    { re: /`([^`]+)`/g, wrap: (s, k) => <code key={k} className="discord-code">{s}</code> },
+  ]
+
+  const combined = patterns.map(p => `(${p.re.source.slice(1,-1)})`).join('|')
+  const re = new RegExp(combined, 'g')
+  const parts = text.split(re)
+  let key = startKey
+  return parts.map((part, i) => {
+    if (!part) return null
+    for (const p of patterns) {
+      const m = part.match(p.re)
+      if (m) return p.wrap(m[1], key++)
+    }
+    return <span key={key++}>{part}</span>
+  }) ?? text
 }
 
 export default function MessagePreview({ msg, webhookName, webhookAvatar }) {
