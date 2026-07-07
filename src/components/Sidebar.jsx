@@ -1,11 +1,16 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 
-export default function Sidebar({ webhooks, activeId, onSelect, onAdd, onRemove, onRename, onSaveConfig, onLoadConfig }) {
+export default function Sidebar({
+  webhooks, activeId, onSelect, onAdd, onRemove, onRename,
+  onSaveConfig, onLoadConfig, fileRef,
+  backups, onSaveBackup, onLoadBackup, onDeleteBackup,
+  onShareConfig, backupNameRef,
+}) {
   const [urlInput, setUrlInput] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [editName, setEditName] = useState('')
   const [collapsed, setCollapsed] = useState(false)
-  const fileRef = useRef(null)
+  const [showBackups, setShowBackups] = useState(false)
 
   function handleAdd(e) {
     e.preventDefault()
@@ -95,10 +100,37 @@ export default function Sidebar({ webhooks, activeId, onSelect, onAdd, onRemove,
       </div>
 
       <div className="sidebar-config">
-        <button className="btn btn-sm btn-secondary config-btn" onClick={onSaveConfig}>Lưu config</button>
-        <button className="btn btn-sm btn-secondary config-btn" onClick={() => fileRef.current?.click()}>Tải config</button>
+        <button className="btn btn-sm btn-secondary config-btn" onClick={onSaveConfig}>Save</button>
+        <button className="btn btn-sm btn-secondary config-btn" onClick={() => fileRef.current?.click()}>Load</button>
         <input ref={fileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={e => { onLoadConfig(e.target.files[0]); e.target.value = '' }} />
+        <button className="btn btn-sm btn-secondary config-btn" onClick={onShareConfig}>Share</button>
+        <button className="btn btn-sm btn-secondary config-btn" onClick={() => setShowBackups(!showBackups)}>Backup</button>
       </div>
+
+      {showBackups && (
+        <div className="sidebar-backups">
+          <div className="sidebar-backups-header">
+            <h3>Backups ({backups.length})</h3>
+            <button className="btn-icon" onClick={() => setShowBackups(false)}>✕</button>
+          </div>
+          <div className="form-row" style={{ padding: '4px 8px' }}>
+            <input ref={backupNameRef} className="input" placeholder="Tên backup..." style={{ fontSize: 12 }} />
+            <button className="btn btn-sm btn-primary" onClick={() => { onSaveBackup(); setShowBackups(false) }}>Save</button>
+          </div>
+          <div className="backup-mini-list">
+            {backups.length === 0 && <div className="empty-list" style={{ fontSize: 12 }}>Chưa có backup</div>}
+            {backups.map(b => (
+              <div key={b.id} className="backup-mini-item">
+                <div className="backup-mini-info" onClick={() => { onLoadBackup(b.id); setShowBackups(false) }}>
+                  <span className="backup-mini-name">{b.name}</span>
+                  <span className="backup-mini-time">{new Date(b.timestamp).toLocaleDateString()}</span>
+                </div>
+                <button className="btn-icon danger" onClick={() => onDeleteBackup(b.id)} style={{ fontSize: 10 }}>✕</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
