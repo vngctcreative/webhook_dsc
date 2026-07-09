@@ -1,21 +1,49 @@
 import { useState } from 'react'
+import { extractWebhookParts, fetchWebhookInfo } from '../lib/discord'
 
 export default function Sidebar({
-  webhooks, activeId, onSelect, onAdd, onRemove, onRename,
+  webhooks, activeId, onSelect, onAdd, onRemove, onRename, onUpdateUrl,
   onSaveConfig, onLoadConfig, fileRef,
   backups, onSaveBackup, onLoadBackup, onDeleteBackup,
-  onShareConfig, backupNameRef,
+  onShareConfig, backupNameRef, onStatus,
 }) {
   const [urlInput, setUrlInput] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [editName, setEditName] = useState('')
+  const [editingUrlId, setEditingUrlId] = useState(null)
+  const [editUrl, setEditUrl] = useState('')
   const [collapsed, setCollapsed] = useState(false)
   const [showBackups, setShowBackups] = useState(false)
+  const [loading, setLoading] = useState(false)
 
-  function handleAdd(e) {
+  async function handleAdd(e) {
     e.preventDefault()
-    onAdd(urlInput)
-    setUrlInput('')
+    const url = urlInput.trim()
+    if (!url) return
+    if (!extractWebhookParts(url)) {
+      onStatus?.({ type: 'error', text: 'URL webhook không hợp lệ (cần dạng discord.com/api/webhooks/...)' })
+      return
+    }
+    setLoading(true)
+    try {
+      const info = await fetchWebhookInfo(url)
+      onAdd({
+        url: info.url || url,
+        name: info.name,
+        avatar: info.avatar,
+        channel_id: info.channel_id,
+        guild_id: info.guild_id,
+      })
+      setUrlInput('')
+      onStatus?.({ type: 'success', text: `Đã thêm webhook: ${info.name}` })
+    } catch (err) {
+      // Vẫn cho thêm URL nếu GET fail (CORS / network) — dùng tên tạm
+      onAdd({ url, name: 'Webhook', avatar: '' })
+      setUrlInput('')
+      onStatus?.({ type: 'error', text: `Thêm URL nhưng không lấy được info: ${err.message}` })
+    } finally {
+      setLoading(false)
+    }
   }
 
   function startRename(w) {
@@ -26,6 +54,33 @@ export default function Sidebar({
   function submitRename(id) {
     onRename(id, editName.trim() || `Webhook ${webhooks.findIndex(w => w.id === id) + 1}`)
     setEditingId(null)
+  }
+
+  function startEditUrl(w) {
+    setEditingUrlId(w.id)
+    setEditUrl(w.url)
+  }
+
+  async function submitUrl(id) {
+    const url = editUrl.trim()
+    setEditingUrlId(null)
+    if (!url || !extractWebhookParts(url)) {
+      onStatus?.({ type: 'error', text: 'URL không hợp lệ' })
+      return
+    }
+    try {
+      const info = await fetchWebhookInfo(url)
+      onUpdateUrl?.(id, {
+        url: info.url || url,
+        name: info.name,
+        avatar: info.avatar,
+        channel_id: info.channel_id,
+        guild_id: info.guild_id,
+      })
+      onStatus?.({ type: 'success', text: 'Đã cập nhật webhook' })
+    } catch {
+      onUpdateUrl?.(id, { url })
+    }
   }
 
   if (collapsed) {
@@ -53,15 +108,19 @@ export default function Sidebar({
           placeholder="Paste webhook URL..."
           value={urlInput}
           onChange={e => setUrlInput(e.target.value)}
+          disabled={loading}
         />
-        <button className="btn btn-primary btn-add" type="submit" disabled={!urlInput.trim()}>+</button>
+        <button className="btn btn-primary btn-add" type="submit" disabled={!urlInput.trim() || loading} title="Add webhook">
+          {loading ? '…' : '+'}
+        </button>
       </form>
+      <p className="sidebar-hint">Integrations → Webhooks → Copy URL</p>
 
       <div className="webhook-list">
         {webhooks.length === 0 && (
-          <div className="empty-list">Chưa có webhook. Thêm URL ở trên.</div>
+          <div className="empty-list">Chưa có webhook. Dán URL ở trên.</div>
         )}
-        {webhooks.map((w, i) => (
+        {webhooks.map((w) => (
           <div
             key={w.id}
             className={`webhook-item ${w.id === activeId ? 'active' : ''}`}
@@ -71,7 +130,7 @@ export default function Sidebar({
               {w.avatar ? (
                 <img src={w.avatar} alt="" className="wh-avatar" />
               ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+                <div className="wh-avatar-fallback">{(w.name || 'W')[0]?.toUpperCase()}</div>
               )}
             </div>
             <div className="webhook-info">
@@ -86,9 +145,28 @@ export default function Sidebar({
                   onClick={e => e.stopPropagation()}
                 />
               ) : (
-                <span className="webhook-name" onDoubleClick={() => startRename(w)}>{w.name}</span>
+                <span className="webhook-name" onDoubleClick={() => startRename(w)} title="Double-click để đổi tên">{w.name}</span>
               )}
-              <span className="webhook-url">{w.url.length > 30 ? w.url.slice(0, 30) + '...' : w.url}</span>
+              {editingUrlId === w.id ? (
+                <input
+                  className="input inline-input"
+                  value={editUrl}
+                  onChange={e => setEditUrl(e.target.value)}
+                  onBlur={() => submitUrl(w.id)}
+                  onKeyDown={e => e.key === 'Enter' && submitUrl(w.id)}
+                  autoFocus
+                  onClick={e => e.stopPropagation()}
+                  style={{ fontSize: 11 }}
+                />
+              ) : (
+                <span
+                  className="webhook-url"
+                  onDoubleClick={(e) => { e.stopPropagation(); startEditUrl(w) }}
+                  title="Double-click để sửa URL"
+                >
+                  {w.url ? (w.url.length > 36 ? w.url.slice(0, 36) + '…' : w.url) : '(chưa có URL)'}
+                </span>
+              )}
             </div>
             <button
               className="btn-icon danger remove-btn"

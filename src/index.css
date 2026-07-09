@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 *,
 *::before,
 *::after {
@@ -7,45 +9,80 @@
 }
 
 :root {
-  --bg-primary: #1e1f22;
-  --bg-secondary: #2b2d31;
-  --bg-tertiary: #313338;
+  /* Surfaces — Discord dark polish */
+  --bg-deep: #111214;
+  --bg-primary: #1a1b1e;
+  --bg-secondary: #232428;
+  --bg-tertiary: #2b2d31;
+  --bg-elevated: #2f3136;
   --bg-input: #1e1f22;
-  --bg-hover: #383a40;
-  --bg-active: #404249;
-  --bg-card: #2b2d31;
-  --text-primary: #dbdee1;
-  --text-secondary: #949ba4;
-  --text-muted: #6d7278;
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-active: rgba(88, 101, 242, 0.14);
+  --bg-card: #25262b;
+  --bg-preview: #313338;
+
+  /* Text */
+  --text-primary: #f2f3f5;
+  --text-secondary: #b5bac1;
+  --text-muted: #80848e;
+  --text-link: #00a8fc;
+
+  /* Brand */
   --accent: #5865f2;
   --accent-hover: #4752c4;
+  --accent-soft: rgba(88, 101, 242, 0.16);
+  --accent-ring: rgba(88, 101, 242, 0.45);
   --accent-green: #23a55a;
-  --accent-red: #da373c;
+  --accent-green-soft: rgba(35, 165, 90, 0.14);
+  --accent-red: #f23f43;
+  --accent-red-soft: rgba(242, 63, 67, 0.14);
   --accent-yellow: #f0b232;
-  --border: #3f4148;
-  --border-light: #2b2d31;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --radius: 8px;
-  --radius-sm: 4px;
-  --radius-lg: 12px;
-  --font: 'Segoe UI', 'Noto Sans', system-ui, -apple-system, sans-serif;
-  --sidebar-width: 260px;
-  --header-height: 48px;
-  --mention-background: rgba(88,101,242,0.3);
+  --accent-yellow-soft: rgba(240, 178, 50, 0.14);
+
+  /* Borders & effects */
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.1);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 0 1px var(--accent-ring), 0 4px 20px rgba(88, 101, 242, 0.2);
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+
+  --font: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+
+  --header-height: 56px;
+  --footer-height: 36px;
+  --sidebar-w: 240px;
+  --msg-w: 220px;
+
+  --mention-background: rgba(88, 101, 242, 0.28);
   --mention-foreground: #dee0fc;
+
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --transition: 0.15s var(--ease);
 }
 
 html, body, #root {
   height: 100%;
-  background: var(--bg-primary);
+  background: var(--bg-deep);
   color: var(--text-primary);
   font-family: var(--font);
   font-size: 14px;
   line-height: 1.5;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-a { color: var(--accent); text-decoration: none; }
+a {
+  color: var(--text-link);
+  text-decoration: none;
+}
 a:hover { text-decoration: underline; }
 
 input, textarea, select, button {
@@ -53,7 +90,17 @@ input, textarea, select, button {
   font-size: inherit;
 }
 
-::-webkit-scrollbar { width: 6px; }
+::selection {
+  background: rgba(88, 101, 242, 0.4);
+  color: #fff;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); background-clip: padding-box; }
