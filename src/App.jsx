@@ -7,6 +7,7 @@ import {
   LIMITS, buildPayload, extractWebhookParts, extractMessageId, extractThreadIdFromLink,
   embedFromApi, componentsFromApi, sendOrUpdateMessage, getWebhookMessage,
   deleteWebhookMessage, messageLinkFromResponse, embedCharCount, fetchWebhookInfo,
+  resolveAttachments, mergePayloadEmbeds, isImageUrl, filenameFromUrl,
 } from './lib/discord'
 import './App.css'
 
@@ -17,12 +18,24 @@ const EMPTY_EMBED = () => ({
   thumbnail: '', image: '', fields: [], timestamp: false,
 })
 
+/** @returns attachment url entry — default upload = file đính kèm thật trên Discord */
+const EMPTY_URL_ATT = (url = '') => ({
+  id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+  url,
+  name: url ? filenameFromUrl(url) : '',
+  mode: 'upload', // upload (attachment) | embed | link | auto
+})
+
 const EMPTY_MSG = () => ({
   id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
   content: '',
   embeds: [],
   components: [],
-  filePreview: null,
+  /** remote URL attachments (serializable) */
+  attachments: [],
+  /** local file previews only — actual File objects stay on <input multiple> */
+  localPreviews: [],
+  filePreview: null, // legacy single preview
   messageLink: '',
   username: '',
   avatar_url: '',
@@ -111,6 +124,7 @@ export default function App() {
   const fileRef = useRef(null)
   const backupNameRef = useRef(null)
   const contentRef = useRef(null)
+  const [attachUrlInput, setAttachUrlInput] = useState('')
 
   useEffect(() => { localStorage.setItem('wh_webhooks', JSON.stringify(webhooks)) }, [webhooks])
   useEffect(() => { localStorage.setItem('wh_activeId', JSON.stringify(activeId)) }, [activeId])
@@ -388,6 +402,7 @@ export default function App() {
           content: m.content,
           embeds: m.embeds,
           components: m.components,
+          attachments: m.attachments || [],
           username: m.username,
           avatar_url: m.avatar_url,
           thread_name: m.thread_name,
@@ -568,40 +583,47 @@ export default function App() {
     setStatus({ type: 'info', text: 'Đang gửi...' })
     let success = 0
     let fail = 0
+    const allWarnings = []
 
     for (const { m, i } of toSendIdx) {
-      const payload = buildPayload(m, activeWebhook)
-      const hasContent =
-        payload.content ||
-        payload.embeds?.length ||
-        payload.components?.length ||
-        document.querySelector(`.file-${m.id}`)?.files?.[0]
-
-      if (!hasContent) {
-        fail++
-        setHistory((prev) =>
-          [{
-            id: Date.now() + i,
-            webhookName: activeWebhook.name,
-            content: '(empty)',
-            timestamp: new Date().toISOString(),
-            status: 'error',
-            error: 'Message trống — cần content, embed, component hoặc file',
-          }, ...prev].slice(0, 200),
-        )
-        continue
-      }
-
       try {
         const fileInput = document.querySelector(`.file-${m.id}`)
-        const file = fileInput?.files?.[0] || null
+        const localFiles = fileInput?.files ? Array.from(fileInput.files) : []
+        const { files, extraEmbeds, warnings } = await resolveAttachments(m.attachments || [], localFiles)
+
+        let payload = buildPayload(m, activeWebhook)
+        payload = mergePayloadEmbeds(payload, extraEmbeds)
+
+        const hasContent =
+          payload.content ||
+          payload.embeds?.length ||
+          payload.components?.length ||
+          files.length > 0
+
+        if (!hasContent) {
+          fail++
+          setHistory((prev) =>
+            [{
+              id: Date.now() + i,
+              webhookName: activeWebhook.name,
+              content: '(empty)',
+              timestamp: new Date().toISOString(),
+              status: 'error',
+              error: 'Message trống — cần content, embed, component, URL hoặc file',
+            }, ...prev].slice(0, 200),
+          )
+          continue
+        }
+
+        if (warnings.length) allWarnings.push(...warnings)
+
         const mid = m.messageLink ? extractMessageId(m.messageLink) : null
         const threadId = m.thread_id || undefined
 
         const result = await sendOrUpdateMessage({
           webhookUrl: activeWebhook.url,
           payload,
-          file,
+          files,
           messageId: mid || undefined,
           threadId,
           method: mid ? 'PATCH' : 'POST',
@@ -647,8 +669,10 @@ export default function App() {
 
     if (fail === 0) {
       setStatus({
-        type: 'success',
-        text: `Đã ${toSendIdx.every(({ m }) => m.messageLink) ? 'cập nhật' : 'gửi'} ${success} tin nhắn!`,
+        type: allWarnings.length ? 'info' : 'success',
+        text: allWarnings.length
+          ? `Đã gửi ${success} tin. Lưu ý: ${allWarnings[0]}`
+          : `Đã ${toSendIdx.every(({ m }) => m.messageLink) ? 'cập nhật' : 'gửi'} ${success} tin nhắn!`,
       })
     } else {
       setStatus({ type: 'error', text: `${success} thành công, ${fail} thất bại — xem History` })
@@ -666,11 +690,20 @@ export default function App() {
     setStatus({ type: 'info', text: 'Đang tải message...' })
     try {
       const d = await getWebhookMessage(activeWebhook.url, mid, msg.thread_id || undefined)
+      const loadedAtts = (d.attachments || []).map((a) => ({
+        id: a.id?.toString() || Date.now().toString(36),
+        url: a.url || a.proxy_url || '',
+        name: a.filename || filenameFromUrl(a.url || ''),
+        mode: 'upload', // re-send as real attachment when possible
+      })).filter((a) => a.url)
+
       updateMsg({
         content: d.content || '',
         embeds: (d.embeds || []).map(embedFromApi),
         components: componentsFromApi(d.components || []),
+        attachments: loadedAtts,
         filePreview: d.attachments?.[0]?.url || null,
+        localPreviews: [],
         flags: d.flags || 0,
       })
       setStatus({ type: 'success', text: 'Đã tải nội dung từ message!' })
@@ -711,6 +744,38 @@ export default function App() {
     } catch (err) {
       setStatus({ type: 'error', text: err.message })
     }
+  }
+
+  function addAttachmentUrl() {
+    const raw = attachUrlInput.trim()
+    if (!raw) return
+    // support paste multiple urls separated by space/newline/comma
+    const urls = raw.split(/[\n\s,]+/).map((s) => s.trim()).filter((s) => /^https?:\/\//i.test(s))
+    if (!urls.length) {
+      setStatus({ type: 'error', text: 'URL phải bắt đầu bằng http:// hoặc https://' })
+      return
+    }
+    const current = msg?.attachments || []
+    const room = LIMITS.attachments - current.length - (msg?.localPreviews?.length || 0)
+    if (room <= 0) {
+      setStatus({ type: 'error', text: `Tối đa ${LIMITS.attachments} attachments` })
+      return
+    }
+    const toAdd = urls.slice(0, room).map((u) => EMPTY_URL_ATT(u))
+    updateMsg({ attachments: [...current, ...toAdd] })
+    setAttachUrlInput('')
+    if (toAdd.length < urls.length) {
+      setStatus({ type: 'info', text: `Chỉ thêm được ${toAdd.length}/${urls.length} (giới hạn ${LIMITS.attachments})` })
+    }
+  }
+
+  function updateAttachment(id, updates) {
+    const list = (msg?.attachments || []).map((a) => (a.id === id ? { ...a, ...updates } : a))
+    updateMsg({ attachments: list })
+  }
+
+  function removeAttachment(id) {
+    updateMsg({ attachments: (msg?.attachments || []).filter((a) => a.id !== id) })
   }
 
   const selectedCount = messages.filter((_, i) => isMsgChecked(i)).length
@@ -989,31 +1054,210 @@ export default function App() {
                         </div>
                       )}
                     </div>
-                    <div className="file-attach-row">
+                  </div>
+
+                  {/* Attachments: URL + multi local files */}
+                  <div className="editor-section">
+                    <div className="section-header">
+                      <h4>
+                        Attachments (
+                        {(msg.attachments?.length || 0) + (msg.localPreviews?.length || 0)}
+                        /{LIMITS.attachments})
+                      </h4>
+                    </div>
+                    <p className="field-hint" style={{ marginTop: 0, marginBottom: 10 }}>
+                      <strong>Upload (mặc định)</strong> = ảnh/file đính kèm bình thường trên Discord.
+                      <strong> Embed</strong> = khung embed (không phải file).
+                      Host chặn CORS → upload URL fail, hãy chọn file local hoặc mode Embed.
+                    </p>
+
+                    <div className="attach-url-add form-row">
+                      <input
+                        className="input"
+                        placeholder="https://example.com/image.png hoặc link file..."
+                        value={attachUrlInput}
+                        onChange={(e) => setAttachUrlInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            addAttachmentUrl()
+                          }
+                        }}
+                      />
+                      <button className="btn btn-sm btn-primary" type="button" onClick={addAttachmentUrl}>
+                        + URL
+                      </button>
+                    </div>
+
+                    <div className="attach-url-batch form-row" style={{ marginTop: 8 }}>
+                      <textarea
+                        className="input"
+                        rows={2}
+                        placeholder="Dán nhiều URL (mỗi dòng một link) rồi bấm Thêm tất cả"
+                        id={`multi-url-${msg.id}`}
+                      />
+                      <button
+                        className="btn btn-sm btn-secondary"
+                        type="button"
+                        onClick={() => {
+                          const el = document.getElementById(`multi-url-${msg.id}`)
+                          const text = el?.value || ''
+                          const urls = text.split(/[\n\s,]+/).map((s) => s.trim()).filter((s) => /^https?:\/\//i.test(s))
+                          if (!urls.length) {
+                            setStatus({ type: 'error', text: 'Không tìm thấy URL hợp lệ' })
+                            return
+                          }
+                          const current = msg.attachments || []
+                          const room = LIMITS.attachments - current.length - (msg.localPreviews?.length || 0)
+                          if (room <= 0) {
+                            setStatus({ type: 'error', text: `Tối đa ${LIMITS.attachments} attachments` })
+                            return
+                          }
+                          const toAdd = urls.slice(0, room).map((u) => EMPTY_URL_ATT(u))
+                          updateMsg({ attachments: [...current, ...toAdd] })
+                          if (el) el.value = ''
+                          setStatus({ type: 'success', text: `Đã thêm ${toAdd.length} URL` })
+                        }}
+                      >
+                        Thêm tất cả
+                      </button>
+                    </div>
+
+                    {(msg.attachments || []).length > 0 && (
+                      <>
+                      <div className="form-row" style={{ marginTop: 8, marginBottom: 4 }}>
+                        <button
+                          className="btn btn-sm btn-secondary"
+                          type="button"
+                          onClick={() => updateMsg({
+                            attachments: (msg.attachments || []).map((a) => ({ ...a, mode: 'upload' })),
+                          })}
+                        >
+                          Tất cả → Upload
+                        </button>
+                        <button
+                          className="btn btn-sm btn-secondary"
+                          type="button"
+                          onClick={() => updateMsg({
+                            attachments: (msg.attachments || []).map((a) => ({ ...a, mode: 'embed' })),
+                          })}
+                        >
+                          Tất cả → Embed
+                        </button>
+                      </div>
+                      <div className="attach-list">
+                        {msg.attachments.map((att) => (
+                          <div key={att.id} className="attach-item">
+                            <div className="attach-thumb">
+                              {isImageUrl(att.url) ? (
+                                <img src={att.url} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                              ) : (
+                                <span className="attach-file-icon">📄</span>
+                              )}
+                            </div>
+                            <div className="attach-meta">
+                              <input
+                                className="input attach-name"
+                                value={att.name}
+                                placeholder="Tên file"
+                                onChange={(e) => updateAttachment(att.id, { name: e.target.value })}
+                              />
+                              <input
+                                className="input attach-url"
+                                value={att.url}
+                                placeholder="URL"
+                                onChange={(e) => updateAttachment(att.id, {
+                                  url: e.target.value,
+                                  name: att.name || filenameFromUrl(e.target.value),
+                                })}
+                              />
+                              <select
+                                className="input attach-mode"
+                                value={att.mode || 'upload'}
+                                onChange={(e) => updateAttachment(att.id, { mode: e.target.value })}
+                                title="Cách gửi lên Discord"
+                              >
+                                <option value="upload">📎 Upload (file thật)</option>
+                                <option value="auto">Auto (upload → fallback embed)</option>
+                                <option value="embed">🖼️ Embed (khung màu)</option>
+                                <option value="link">🔗 Chỉ link</option>
+                              </select>
+                            </div>
+                            <button
+                              className="btn-icon danger"
+                              type="button"
+                              onClick={() => removeAttachment(att.id)}
+                              title="Xoá"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      </>
+                    )}
+
+                    <div className="file-attach-row" style={{ marginTop: 10 }}>
                       <input
                         type="file"
+                        multiple
                         className={`file-${msg.id}`}
                         style={{ fontSize: 13, flex: 1, minWidth: 0 }}
                         onChange={(e) => {
-                          const file = e.target.files[0]
-                          if (file) updateMsg({ filePreview: URL.createObjectURL(file) })
+                          const list = Array.from(e.target.files || [])
+                          const previews = list.map((f) => ({
+                            id: Math.random().toString(36).slice(2, 9),
+                            name: f.name,
+                            size: f.size,
+                            preview: f.type.startsWith('image/') ? URL.createObjectURL(f) : null,
+                            isImage: f.type.startsWith('image/'),
+                          }))
+                          updateMsg({
+                            localPreviews: previews,
+                            filePreview: previews.find((p) => p.preview)?.preview || null,
+                          })
                         }}
                       />
-                      {msg.filePreview && (
+                      {(msg.localPreviews?.length > 0) && (
                         <button
-                          className="btn-icon danger file-remove-btn"
+                          className="btn btn-sm btn-secondary"
                           type="button"
                           onClick={() => {
                             const fi = document.querySelector(`.file-${msg.id}`)
                             if (fi) fi.value = ''
-                            updateMsg({ filePreview: null })
+                            updateMsg({ localPreviews: [], filePreview: null })
                           }}
-                          title="Xoá file"
                         >
-                          ✕
+                          Xoá file local
                         </button>
                       )}
                     </div>
+
+                    {(msg.localPreviews || []).length > 0 && (
+                      <div className="attach-list local">
+                        {msg.localPreviews.map((f) => (
+                          <div key={f.id} className="attach-item compact">
+                            <div className="attach-thumb">
+                              {f.preview ? (
+                                <img src={f.preview} alt="" />
+                              ) : (
+                                <span className="attach-file-icon">📎</span>
+                              )}
+                            </div>
+                            <div className="attach-meta">
+                              <span className="attach-local-name">{f.name}</span>
+                              <span className="attach-local-size">
+                                {f.size < 1024
+                                  ? `${f.size} B`
+                                  : f.size < 1048576
+                                    ? `${(f.size / 1024).toFixed(1)} KB`
+                                    : `${(f.size / 1048576).toFixed(1)} MB`}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Message link / edit */}

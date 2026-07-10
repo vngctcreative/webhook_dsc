@@ -169,11 +169,64 @@ export default function MessagePreview({ msg, webhookName, webhookAvatar }) {
           </span>
         </div>
         {msg.content && <div className="discord-content">{renderContent(msg.content)}</div>}
-        {!msg.content && !hasEmbeds && !hasComponents && !msg.filePreview && (
+        {!msg.content && !hasEmbeds && !hasComponents && !msg.filePreview && !(msg.attachments?.length) && !(msg.localPreviews?.length) && (
           <div className="discord-content discord-empty">(tin nhắn trống)</div>
         )}
 
-        {msg.filePreview && (
+        {/* URL attachments preview */}
+        {(msg.attachments || []).length > 0 && (
+          <div className="discord-attach-grid">
+            {msg.attachments.map((att) => {
+              const isImg = /\.(png|jpe?g|gif|webp|bmp)(\?|$)/i.test(att.url || '') ||
+                /cdn\.discordapp\.com|media\.discordapp\.net|imgur/i.test(att.url || '')
+              if (isImg && att.mode !== 'link') {
+                return (
+                  <div key={att.id} className="discord-file-attach">
+                    <img src={att.url} alt={att.name || ''} className="discord-file-img" />
+                  </div>
+                )
+              }
+              return (
+                <a
+                  key={att.id}
+                  className="discord-file-card"
+                  href={att.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span className="discord-file-card-icon">📄</span>
+                  <span className="discord-file-card-info">
+                    <span className="discord-file-card-name">{att.name || 'file'}</span>
+                    <span className="discord-file-card-url">{att.url}</span>
+                  </span>
+                </a>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Local file previews */}
+        {(msg.localPreviews || []).length > 0 && (
+          <div className="discord-attach-grid">
+            {msg.localPreviews.map((f) =>
+              f.preview ? (
+                <div key={f.id} className="discord-file-attach">
+                  <img src={f.preview} alt={f.name} className="discord-file-img" />
+                </div>
+              ) : (
+                <div key={f.id} className="discord-file-card">
+                  <span className="discord-file-card-icon">📎</span>
+                  <span className="discord-file-card-info">
+                    <span className="discord-file-card-name">{f.name}</span>
+                  </span>
+                </div>
+              ),
+            )}
+          </div>
+        )}
+
+        {/* legacy single preview */}
+        {msg.filePreview && !(msg.localPreviews?.length) && !(msg.attachments?.length) && (
           <div className="discord-file-attach">
             <img src={msg.filePreview} alt="" className="discord-file-img" />
           </div>

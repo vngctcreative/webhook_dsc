@@ -17,6 +17,196 @@ export const LIMITS = {
   embedsTotal: 6000,
   componentRows: 5,
   buttonsPerRow: 5,
+  attachments: 10,
+}
+
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i
+const VIDEO_EXT = /\.(mp4|webm|mov)(\?.*)?$/i
+
+export function isImageUrl(url) {
+  if (!url) return false
+  try {
+    const u = new URL(url)
+    if (IMAGE_EXT.test(u.pathname)) return true
+    // discord cdn / common hosts without extension in path still may be images
+    if (/cdn\.discordapp\.com|media\.discordapp\.net|i\.imgur\.com|images?/i.test(u.hostname)) return true
+  } catch { /* ignore */ }
+  return IMAGE_EXT.test(url)
+}
+
+export function isVideoUrl(url) {
+  try {
+    return VIDEO_EXT.test(new URL(url).pathname)
+  } catch {
+    return VIDEO_EXT.test(url || '')
+  }
+}
+
+export function filenameFromUrl(url) {
+  try {
+    const path = new URL(url).pathname
+    const base = decodeURIComponent(path.split('/').pop() || '')
+    return base || 'file'
+  } catch {
+    return 'file'
+  }
+}
+
+/**
+ * Resolve URL attachments + local File list for Discord send.
+ *
+ * Modes:
+ * - upload (default): fetch URL → multipart file attachment (ảnh/file bình thường trên Discord)
+ * - auto: same as upload, fallback embed/link if CORS blocks
+ * - embed: image as embed.image only (Discord server fetches URL — looks like embed, not file)
+ * - link: clickable link embed only
+ * - Local files always upload as real attachments
+ *
+ * @returns {{ files: File[], extraEmbeds: object[], warnings: string[] }}
+ */
+export async function resolveAttachments(urlAttachments = [], localFiles = []) {
+  const files = []
+  const extraEmbeds = []
+  const warnings = []
+  const max = LIMITS.attachments
+
+  // Local files first — always real Discord attachments
+  for (const f of localFiles) {
+    if (files.length >= max) {
+      warnings.push(`Đã đạt giới hạn ${max} file upload`)
+      break
+    }
+    if (f instanceof File || f instanceof Blob) files.push(f)
+  }
+
+  for (const att of urlAttachments) {
+    const url = (att.url || '').trim()
+    if (!url) continue
+    const name = att.name || filenameFromUrl(url)
+    // default = upload (real file attachment, not embed)
+    const mode = att.mode || 'upload' // upload | auto | embed | link
+
+    if (mode === 'link') {
+      extraEmbeds.push({
+        title: name || 'File',
+        url,
+        description: url,
+        color: 0x5865f2,
+      })
+      continue
+    }
+
+    // Force embed image (not a file attachment)
+    if (mode === 'embed') {
+      if (isImageUrl(url)) {
+        extraEmbeds.push({ image: { url } })
+      } else {
+        extraEmbeds.push({
+          title: name || 'Attachment',
+          url,
+          description: `🔗 ${url}`,
+          color: 0x5865f2,
+        })
+        warnings.push(`"${name}" không phải ảnh — mode Embed gửi dạng link`)
+      }
+      continue
+    }
+
+    // upload | auto → try real file upload first
+    if (files.length >= max) {
+      if (isImageUrl(url)) {
+        extraEmbeds.push({ image: { url } })
+        warnings.push(`Hết slot file — "${name}" gửi dạng embed`)
+      } else {
+        extraEmbeds.push({
+          title: name || 'Attachment',
+          url,
+          description: `🔗 ${url}`,
+          color: 0x5865f2,
+        })
+      }
+      continue
+    }
+
+    try {
+      const res = await fetch(url, { mode: 'cors' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const blob = await res.blob()
+      let type = blob.type || ''
+      // Some hosts return empty type
+      if (!type || type === 'application/octet-stream') {
+        if (isImageUrl(url)) type = guessImageMime(url)
+        else if (isVideoUrl(url)) type = 'video/mp4'
+        else type = type || 'application/octet-stream'
+      }
+      let fname = name
+      if (!fname.includes('.')) fname = `${fname}${extFromMime(type) || extFromUrl(url)}`
+      // Ensure image files have image/* type so Discord shows them as images
+      if (isImageUrl(url) && !type.startsWith('image/')) {
+        type = guessImageMime(url) || 'image/png'
+      }
+      files.push(new File([blob], fname, { type }))
+    } catch (err) {
+      // CORS / network — cannot upload from browser
+      if (isImageUrl(url)) {
+        extraEmbeds.push({ image: { url } })
+        warnings.push(
+          `Không upload được "${name}" (${err.message}). Host chặn CORS → fallback ảnh embed. ` +
+          `Muốn attachment thật: tải về máy rồi chọn file local, hoặc bật CORS trên host.`,
+        )
+      } else {
+        extraEmbeds.push({
+          title: name || 'Attachment',
+          url,
+          description: `🔗 ${url}`,
+          color: 0x5865f2,
+        })
+        warnings.push(`Không tải được "${name}": ${err.message} → gửi dạng link`)
+      }
+    }
+  }
+
+  return { files, extraEmbeds, warnings }
+}
+
+function guessImageMime(url) {
+  const u = (url || '').toLowerCase()
+  if (u.includes('.png') || u.includes('format=png')) return 'image/png'
+  if (u.includes('.gif')) return 'image/gif'
+  if (u.includes('.webp')) return 'image/webp'
+  if (u.includes('.jpg') || u.includes('.jpeg')) return 'image/jpeg'
+  return 'image/png'
+}
+
+function extFromUrl(url) {
+  try {
+    const m = new URL(url).pathname.match(/(\.[a-z0-9]+)$/i)
+    return m ? m[1] : ''
+  } catch {
+    return ''
+  }
+}
+
+function extFromMime(type) {
+  const map = {
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'application/pdf': '.pdf',
+    'text/plain': '.txt',
+    'video/mp4': '.mp4',
+  }
+  return map[type] || ''
+}
+
+/** Merge payload embeds with attachment embeds (cap 10) */
+export function mergePayloadEmbeds(payload, extraEmbeds = []) {
+  if (!extraEmbeds.length) return payload
+  const p = { ...payload }
+  const existing = p.embeds || []
+  p.embeds = [...existing, ...extraEmbeds].slice(0, LIMITS.embeds)
+  return p
 }
 
 export function extractWebhookParts(url) {
@@ -295,11 +485,13 @@ function flattenErrors(obj, path = '') {
 /**
  * Execute webhook (POST) or edit message (PATCH).
  * Uses wait=true & with_components=true (link buttons on non-app webhooks).
+ * @param {File|File[]|null} file - single file or array of files
  */
 export async function sendOrUpdateMessage({
   webhookUrl,
   payload,
   file,
+  files,
   messageId,
   threadId,
   method, // 'POST' | 'PATCH'
@@ -330,11 +522,24 @@ export async function sendOrUpdateMessage({
     delete bodyPayload.tts
   }
 
+  // Normalize files list
+  let fileList = []
+  if (Array.isArray(files)) fileList = files.filter(Boolean)
+  else if (file) fileList = Array.isArray(file) ? file.filter(Boolean) : [file]
+  fileList = fileList.slice(0, LIMITS.attachments)
+
   let res
-  if (file) {
+  if (fileList.length > 0) {
     const form = new FormData()
+    // attachment metadata optional
+    bodyPayload.attachments = fileList.map((f, i) => ({
+      id: i,
+      filename: f.name || `file_${i}`,
+    }))
     form.append('payload_json', JSON.stringify(bodyPayload))
-    form.append('files[0]', file, file.name)
+    fileList.forEach((f, i) => {
+      form.append(`files[${i}]`, f, f.name || `file_${i}`)
+    })
     res = await fetch(url, { method: isUpdate ? 'PATCH' : 'POST', body: form })
   } else {
     res = await fetch(url, {
